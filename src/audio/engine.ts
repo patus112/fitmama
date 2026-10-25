@@ -176,10 +176,25 @@ export class MusicEngine {
     }, 500);
   }
 
-  /**
-   * `play()` on her own file, in the gesture that picked it or pressed play.
-   * Pass `audible: false` to unlock the element and then pause it.
-   */
+  /** Remember the current song, then `play()` the new file in this turn. */
+  holdFile(url: string): string {
+    const previous = this.custom?.getAttribute('src') ?? '';
+    this.armFile(url, false);
+    return previous;
+  }
+
+  releaseFile(previousSrc: string): void {
+    if (!this.custom) return;
+    this.armToken += 1;
+    this.fileAudible = false;
+    this.custom.pause();
+    if (previousSrc) this.custom.src = previousSrc;
+    else {
+      this.custom.removeAttribute('src');
+      this.custom.src = '';
+    }
+  }
+
   armFile(url: string, audible: boolean): void {
     const token = ++this.armToken;
     const el = this.prepareFile(url);
