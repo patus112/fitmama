@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { ArrowDown, ArrowUp, ChevronLeft, CircleAlert, Heart, Play, Timer, Wind } from 'lucide-react';
-import { primeAudioFromGesture } from '../audio/engine';
+import { music, unlockAudio } from '../audio/engine';
 import { ExerciseFigure } from '../components/ExerciseFigure';
 import { equipmentLabel, exerciseById } from '../domain/catalog';
 import { completedDayKeys, frontierDay } from '../domain/plan';
@@ -9,8 +9,12 @@ import { useAppState } from '../state/AppState';
 
 export function ExerciseDetailScreen({ id }: { id: string }) {
   const exercise = exerciseById(id);
-  const { favorites, toggleFavorite, sessions } = useAppState();
+  const { favorites, toggleFavorite, sessions, settings, customUrl } = useAppState();
   const reduce = useReducedMotion();
+  function beginAudio() {
+    unlockAudio();
+    if (settings.trackId === 'custom' && customUrl) music.armFile(customUrl, false);
+  }
   const [pose, setPose] = useState(0);
 
   useEffect(() => {
@@ -129,7 +133,7 @@ export function ExerciseDetailScreen({ id }: { id: string }) {
         <a
           className="btn btn-coral detail-cta"
           href={`#/game/${frontier.phaseIndex}/${frontier.day}`}
-          onClick={() => primeAudioFromGesture()}
+          onClick={beginAudio}
         >
           <Play size={18} fill="#3B2A24" aria-hidden="true" />
           Play it as a game

@@ -1,6 +1,6 @@
 import { useRef, useState } from 'react';
 import { format } from 'date-fns';
-import { primeAudioFromGesture, music } from '../audio/engine';
+import { music, unlockAudio } from '../audio/engine';
 import { GameClock } from '../audio/clock';
 import { SoundControl } from '../components/SoundControl';
 import { sessionsToCsv, sessionsToJson } from '../domain/exportData';
@@ -25,7 +25,7 @@ export function SettingsScreen() {
   const [tapHint, setTapHint] = useState('Tap the beat a few times');
 
   function preview() {
-    primeAudioFromGesture();
+    unlockAudio();
     if (settings.muted) {
       setNotice('Music is muted, so this preview stays quiet. Unmute whenever you like.');
       return;
@@ -41,6 +41,12 @@ export function SettingsScreen() {
       getTime: () => clock.now(),
     });
     setNotice('A few seconds, quietly.');
+  }
+
+  function testSound() {
+    unlockAudio();
+    music.playTestTone();
+    setNotice('A short tone.');
   }
 
   function onTapTempo() {
@@ -99,9 +105,14 @@ export function SettingsScreen() {
             </button>
           ))}
         </div>
-        <button type="button" className="btn btn-quiet inline" onClick={preview}>
-          Hear a little
-        </button>
+        <div className="export-row">
+          <button type="button" className="btn btn-quiet" onClick={preview}>
+            Hear a little
+          </button>
+          <button type="button" className="btn btn-quiet" data-testid="test-sound" onClick={testSound}>
+            Test sound
+          </button>
+        </div>
       </section>
 
       <section className="card">
