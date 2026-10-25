@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Check, Flame, Leaf, Lock, Play, Star } from 'lucide-react';
-import { primeAudioFromGesture } from '../audio/engine';
+import { music, unlockAudio } from '../audio/engine';
 import { formatPoints } from '../domain/format';
 import {
   DAYS_PER_PHASE,
@@ -27,8 +27,12 @@ function LeafMark({ className }: { className: string }) {
 }
 
 export function PlanScreen() {
-  const { sessions } = useAppState();
+  const { sessions, settings, customUrl } = useAppState();
   const reduce = useReducedMotion();
+  function beginAudio() {
+    unlockAudio();
+    if (settings.trackId === 'custom' && customUrl) music.armFile(customUrl, false);
+  }
   const keys = completedDayKeys(sessions);
   const frontier = frontierDay(keys);
   const finished = planComplete(keys);
@@ -148,6 +152,7 @@ export function PlanScreen() {
                 left={position.x - TILE / 2}
                 top={position.y - TILE / 2}
                 href={`#/game/${ref.phaseIndex}/${ref.day}`}
+                onBegin={beginAudio}
               />
             );
           })}
@@ -155,7 +160,7 @@ export function PlanScreen() {
             <aside className="callout" style={calloutStyle(calloutDay.day - 1)} data-testid="day-callout">
               <h2>{finished ? 'You finished this round' : dayTitle(calloutDay)}</h2>
               <p>{finished ? 'Play the last day again whenever you want.' : '3 min · lying down'}</p>
-              <a className="btn btn-coral" href={`#/game/${calloutDay.phaseIndex}/${calloutDay.day}`} data-testid="start-day" onClick={() => primeAudioFromGesture()}>
+              <a className="btn btn-coral" href={`#/game/${calloutDay.phaseIndex}/${calloutDay.day}`} data-testid="start-day" onClick={beginAudio}>
                 <Play size={18} fill="#3B2A24" aria-hidden="true" />
                 Start
               </a>
@@ -195,6 +200,7 @@ function DayTile({
   left,
   top,
   href,
+  onBegin,
 }: {
   id: string;
   testId: string;
@@ -204,12 +210,13 @@ function DayTile({
   left: number;
   top: number;
   href: string;
+  onBegin: () => void;
 }) {
   const style = { left, top };
   const label = state === 'done' ? `Day ${day}, ${title}, done` : state === 'current' ? `Day ${day}, ${title}, ready` : `Day ${day}, not open yet`;
   if (state === 'current') {
     return (
-      <a id={id} href={href} className="day-tile current" style={style} data-testid={testId} data-state={state} aria-current="step" aria-label={label} onClick={() => primeAudioFromGesture()}>
+      <a id={id} href={href} className="day-tile current" style={style} data-testid={testId} data-state={state} aria-current="step" aria-label={label} onClick={onBegin}>
         <Play size={18} fill="#3B2A24" aria-hidden="true" />
         <span>Day {day}</span>
       </a>

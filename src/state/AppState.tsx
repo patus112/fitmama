@@ -1,5 +1,5 @@
 import { createContext, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
-import { music } from '../audio/engine';
+import { music, unlockAudio } from '../audio/engine';
 import {
   clearCustomAudio,
   loadCustomAudio,
@@ -123,11 +123,14 @@ export function AppProvider({ children }: { children: ReactNode }) {
           setNotice('That file is over 20 MB. A shorter song is easier to keep on this phone.');
           return;
         }
+        const url = URL.createObjectURL(file);
+        replaceUrl(url);
+        setCustomName(file.name);
+        persist({ trackId: 'custom' });
+        unlockAudio();
+        music.armFile(url, false);
         try {
           await saveCustomAudio(file, file.name);
-          setCustomName(file.name);
-          replaceUrl(URL.createObjectURL(file));
-          persist({ trackId: 'custom' });
           setNotice(null);
         } catch {
           setNotice('Could not keep that file on this phone.');

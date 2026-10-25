@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { ArrowDown, ArrowUp, Pause, Play, Star } from 'lucide-react';
 import { format } from 'date-fns';
 import { GameClock } from '../audio/clock';
-import { music } from '../audio/engine';
+import { music, unlockAudio } from '../audio/engine';
 import { Character } from '../components/Character';
 import { SoundControl } from '../components/SoundControl';
 import { countdownFrom, gameSeconds } from '../config';
@@ -258,6 +258,9 @@ function LiveGame({
   }
 
   function resume() {
+    unlockAudio();
+    if (trackId === 'custom' && customUrl) music.armFile(customUrl, true);
+    else music.resume();
     setSaveError(null);
     setMode('play');
   }

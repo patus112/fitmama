@@ -57,7 +57,23 @@ test('plan, library, and calm copy are on the main screens', async ({ page }) =>
   await expect(page.getByRole('slider', { name: 'Music volume' })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Mute music' })).toBeVisible();
   await expect(page.getByLabel('Choose an audio file')).toBeAttached();
+  await expect(page.getByRole('button', { name: 'Test sound' })).toBeVisible();
   await expectNoAxeViolations(page);
+});
+
+test('test sound and preview unlock audio in the tap', async ({ page }) => {
+  await page.goto('/fitmama/#/settings');
+  await page.getByRole('button', { name: 'Test sound' }).click();
+  await expect(page.getByRole('status')).toHaveText('A short tone.');
+  const afterTone = await page.evaluate(() => window.__fitmamaAudioLog ?? []);
+  expect(afterTone).toContain('resume');
+  expect(afterTone).toContain('silent-buffer');
+  expect(afterTone).toContain('tone');
+
+  await page.getByRole('button', { name: 'Hear a little' }).click();
+  await expect(page.getByRole('status')).toHaveText('A few seconds, quietly.');
+  const afterPreview = await page.evaluate(() => window.__fitmamaAudioLog ?? []);
+  expect(afterPreview).toContain('synth');
 });
 
 test('finishing a day saves the result and unlocks the next day', async ({ page }) => {

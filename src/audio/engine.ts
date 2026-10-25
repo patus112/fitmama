@@ -1,4 +1,12 @@
 import type { TrackId } from '../domain/tracks';
+import {
+  SILENT_WAV,
+  audibleGain,
+  playInGesture,
+  preferPlaybackSession,
+  startTone,
+  unlockWebAudio,
+} from './unlock';
 
 interface Timbre {
   wave: OscillatorType;
@@ -23,11 +31,78 @@ export interface MusicStart {
 }
 
 let shared: AudioContext | null = null;
+let keeper: HTMLAudioElement | null = null;
+let watching = false;
 
-export function primeAudioFromGesture(): void {
-  const audio = shared ?? new AudioContext();
-  shared = audio;
-  if (audio.state === 'suspended') void audio.resume();
+function trace(step: string): void {
+  if (typeof window === 'undefined' || !import.meta.env.DEV) return;
+  const host = window as Window & { __fitmamaAudioLog?: string[] };
+  host.__fitmamaAudioLog ??= [];
+  host.__fitmamaAudioLog.push(step);
+}
+
+function createContext(): AudioContext {
+  const host = window as Window & { webkitAudioContext?: typeof AudioContext };
+  const Ctx = window.AudioContext ?? host.webkitAudioContext;
+  if (!Ctx) throw new Error('This phone has no Web Audio.');
+  return new Ctx();
+}
+
+function context(): AudioContext {
+  if (!shared) shared = createContext();
+  return shared;
+}
+
+function silentKeeper(): HTMLAudioElement {
+  if (!keeper) {
+    keeper = document.createElement('audio');
+    keeper.setAttribute('aria-hidden', 'true');
+    keeper.preload = 'auto';
+    keeper.style.position = 'absolute';
+    keeper.style.width = '0';
+    keeper.style.height = '0';
+    keeper.style.opacity = '0';
+    keeper.style.pointerEvents = 'none';
+    document.body.append(keeper);
+  }
+  return keeper;
+}
+
+function watchInterruptions(audio: AudioContext): void {
+  if (watching) return;
+  watching = true;
+  audio.addEventListener('statechange', () => {
+    if ((audio.state as string) === 'interrupted') {
+      trace('resume-interrupted');
+      void audio.resume();
+      const loop = keeper;
+      if (loop?.paused) void loop.play().catch(() => undefined);
+    }
+  });
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState !== 'visible') return;
+    if (audio.state !== 'running') {
+      trace('resume-visible');
+      void audio.resume();
+    }
+    const loop = keeper;
+    if (loop?.paused) void loop.play().catch(() => undefined);
+  });
+}
+
+/**
+ * Call this directly inside a tap or click, before any await.
+ * iOS only unlocks audio in that same turn.
+ */
+export function unlockAudio(): void {
+  preferPlaybackSession(navigator as Navigator & { audioSession?: { type: string } });
+  const audio = context();
+  watchInterruptions(audio);
+  unlockWebAudio(audio as unknown as Parameters<typeof unlockWebAudio>[0]);
+  trace('resume');
+  trace('silent-buffer');
+  void playInGesture(silentKeeper(), SILENT_WAV, 0.001).catch(() => undefined);
+  trace('silent-html');
 }
 
 /**
@@ -46,6 +121,8 @@ export class MusicEngine {
   private bpm = 96;
   private trackId = 'sunday-stretch';
   private custom: HTMLAudioElement | null = null;
+  private fileAudible = false;
+  private armToken = 0;
   private getTime: () => number = () => 0;
 
   apply(volume: number, muted: boolean): void {
@@ -55,7 +132,11 @@ export class MusicEngine {
     this.pushGain();
   }
 
-  async start(options: MusicStart): Promise<void> {
+  /**
+   * Starts nodes or calls `play()` before returning. The promise only reports
+   * a later file-playback failure; it is not awaited before sound begins.
+   */
+  start(options: MusicStart): Promise<void> {
     this.stopNodes();
     this.volume = options.volume;
     this.muted = options.muted;
@@ -63,47 +144,84 @@ export class MusicEngine {
     this.trackId = options.trackId;
     this.getTime = options.getTime;
     if (options.trackId === 'custom' && options.customUrl) {
-      await this.startFile(options.customUrl);
-      return;
+      return this.startFile(options.customUrl);
     }
-    await this.startProcedural();
+    this.startProcedural();
+    return Promise.resolve();
   }
 
-  async preview(options: MusicStart, ms = 5000): Promise<void> {
-    await this.start(options);
+  preview(options: MusicStart, ms = 5000): Promise<void> {
+    const pending = this.start(options);
     this.previewTimer = window.setTimeout(() => this.stop(), ms);
+    return pending;
+  }
+
+  /** A short beep through the same master bus, loud enough to hear on a phone. */
+  playTestTone(): void {
+    const audio = this.ensureMaster();
+    if (audio.state !== 'running') void audio.resume();
+    const previous = this.outputGain();
+    const bus = Math.max(previous, 0.12);
+    if (this.master) this.master.gain.value = bus;
+    startTone(audio as unknown as Parameters<typeof startTone>[0], this.master, {
+      frequency: 523.25,
+      peak: 0.45,
+      when: audio.currentTime,
+      wave: 'sine',
+      duration: 0.4,
+    });
+    trace('tone');
+    window.setTimeout(() => {
+      if (this.master) this.master.gain.value = this.outputGain();
+    }, 500);
+  }
+
+  /**
+   * `play()` on her own file, in the gesture that picked it or pressed play.
+   * Pass `audible: false` to unlock the element and then pause it.
+   */
+  armFile(url: string, audible: boolean): void {
+    const token = ++this.armToken;
+    const el = this.prepareFile(url);
+    this.fileAudible = audible;
+    const pending = playInGesture(el, url, audible ? this.elementVolume() : 0.001);
+    if (!audible) {
+      void pending.then(() => {
+        if (this.armToken !== token || this.fileAudible) return;
+        el.pause();
+        try {
+          el.currentTime = 0;
+        } catch {
+          /* The file may not be seekable yet. */
+        }
+      });
+    }
   }
 
   pause(): void {
     this.running = false;
+    this.fileAudible = false;
     window.clearTimeout(this.timer);
     if (this.custom) this.custom.pause();
     if (shared && shared.state === 'running') void shared.suspend();
   }
 
-  async resume(): Promise<void> {
-    if (this.custom) {
-      try {
-        await this.custom.play();
-      } catch {
-        /* Autoplay can fail; the chart still moves. */
-      }
+  resume(): void {
+    if (shared && shared.state !== 'running') void shared.resume();
+    if (this.trackId === 'custom' && this.custom?.src) {
+      this.fileAudible = true;
+      this.armToken += 1;
+      void playInGesture(this.custom, this.custom.src, this.elementVolume()).catch(() => undefined);
       return;
     }
-    if (shared && shared.state === 'suspended') {
-      try {
-        await shared.resume();
-      } catch {
-        return;
-      }
-    }
+    if (this.running) return;
     this.running = true;
+    this.pushGain();
     this.pump();
   }
 
   stop(): void {
     this.stopNodes();
-    if (shared && shared.state === 'suspended') void shared.resume();
   }
 
   private elementVolume(): number {
@@ -111,16 +229,11 @@ export class MusicEngine {
   }
 
   private outputGain(): number {
-    return this.muted ? 0 : this.volume * 0.2;
-  }
-
-  private context(): AudioContext {
-    if (!shared) shared = new AudioContext();
-    return shared;
+    return audibleGain(this.volume, this.muted);
   }
 
   private ensureMaster(): AudioContext {
-    const audio = this.context();
+    const audio = context();
     if (!this.master) {
       const master = audio.createGain();
       master.gain.value = this.outputGain();
@@ -131,15 +244,17 @@ export class MusicEngine {
   }
 
   private pushGain(): void {
-    if (!this.master || !shared) return;
-    this.master.gain.setTargetAtTime(this.outputGain(), shared.currentTime, 0.04);
+    if (!this.master) return;
+    const next = this.outputGain();
+    this.master.gain.value = next;
   }
 
-  private async startProcedural(): Promise<void> {
+  private startProcedural(): void {
     const audio = this.ensureMaster();
-    if (audio.state === 'suspended') await audio.resume();
+    if (audio.state !== 'running') void audio.resume();
     const timbre = TIMBRES[this.trackId] ?? TIMBRES['sunday-stretch'];
     if (!timbre || !this.master) return;
+    this.pushGain();
     const osc = audio.createOscillator();
     const gain = audio.createGain();
     osc.type = 'sine';
@@ -152,14 +267,28 @@ export class MusicEngine {
     this.running = true;
     this.beatIndex = Math.floor(this.getTime() / (60 / this.bpm));
     this.pump();
+    trace('synth');
   }
 
-  private async startFile(url: string): Promise<void> {
-    const audio = new Audio(url);
-    audio.loop = true;
-    audio.volume = this.elementVolume();
-    this.custom = audio;
-    await audio.play();
+  private startFile(url: string): Promise<void> {
+    this.fileAudible = true;
+    this.armToken += 1;
+    const el = this.prepareFile(url);
+    return playInGesture(el, url, this.elementVolume()).then(
+      () => undefined,
+      () => Promise.reject(new Error('file audio did not play')),
+    );
+  }
+
+  private prepareFile(url: string): HTMLAudioElement {
+    if (!this.custom) this.custom = document.createElement('audio');
+    this.custom.loop = true;
+    (this.custom as HTMLAudioElement & { playsInline?: boolean }).playsInline = true;
+    this.custom.setAttribute('playsinline', '');
+    this.custom.setAttribute('webkit-playsinline', 'true');
+    if (this.custom.src !== url) this.custom.src = url;
+    this.custom.volume = this.elementVolume();
+    return this.custom;
   }
 
   private pump = (): void => {
@@ -180,21 +309,18 @@ export class MusicEngine {
 
   private blip(time: number, beat: number, timbre: Timbre): void {
     if (!shared || !this.master) return;
-    const osc = shared.createOscillator();
-    const gain = shared.createGain();
-    osc.type = timbre.wave;
-    osc.frequency.setValueAtTime(beat % 2 === 0 ? timbre.low : timbre.high, time);
-    gain.gain.setValueAtTime(0.0001, time);
-    gain.gain.exponentialRampToValueAtTime(beat % 4 === 0 ? 0.5 : 0.26, time + 0.02);
-    gain.gain.exponentialRampToValueAtTime(0.0001, time + 0.42);
-    osc.connect(gain);
-    gain.connect(this.master);
-    osc.start(time);
-    osc.stop(time + 0.46);
+    startTone(shared as unknown as Parameters<typeof startTone>[0], this.master, {
+      frequency: beat % 2 === 0 ? timbre.low : timbre.high,
+      peak: beat % 4 === 0 ? 0.5 : 0.26,
+      when: time,
+      wave: timbre.wave,
+      duration: 0.42,
+    });
   }
 
   private stopNodes(): void {
     this.running = false;
+    this.fileAudible = false;
     window.clearTimeout(this.timer);
     window.clearTimeout(this.previewTimer);
     if (this.drone) {
@@ -206,11 +332,7 @@ export class MusicEngine {
       this.drone.disconnect();
       this.drone = null;
     }
-    if (this.custom) {
-      this.custom.pause();
-      this.custom.src = '';
-      this.custom = null;
-    }
+    if (this.custom) this.custom.pause();
   }
 }
 
