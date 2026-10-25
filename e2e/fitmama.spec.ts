@@ -1,5 +1,6 @@
 import AxeBuilder from '@axe-core/playwright';
 import { expect, test, type Page } from '@playwright/test';
+import { UNPLAYABLE_SONG } from '../src/domain/songFile';
 
 function boxesOverlap(
   a: { x: number; y: number; width: number; height: number },
@@ -56,7 +57,18 @@ test('plan, library, and calm copy are on the main screens', async ({ page }) =>
   await expect(page.getByRole('heading', { name: 'Profile' })).toBeVisible();
   await expect(page.getByRole('slider', { name: 'Music volume' })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Mute music' })).toBeVisible();
-  await expect(page.getByLabel('Choose an audio file')).toBeAttached();
+  const songInput = page.getByLabel('Choose an audio file');
+  await expect(songInput).toBeAttached();
+  const accept = await songInput.getAttribute('accept');
+  expect(accept).toContain('audio/*');
+  expect(accept).toContain('.mp3');
+  expect(accept).toContain('.m4a');
+  expect(accept).toContain('.opus');
+  expect(accept).toContain('.webm');
+  expect(accept).toContain('.mp4');
+  expect(accept).toContain('audio/mpeg');
+  expect(accept).toContain('audio/mp4');
+  expect(accept).toContain('video/mp4');
   await expect(page.getByRole('button', { name: 'Test sound' })).toBeVisible();
   await expectNoAxeViolations(page);
 });
@@ -74,6 +86,24 @@ test('test sound and preview unlock audio in the tap', async ({ page }) => {
   await expect(page.getByRole('status')).toHaveText('A few seconds, quietly.');
   const afterPreview = await page.evaluate(() => window.__fitmamaAudioLog ?? []);
   expect(afterPreview).toContain('synth');
+});
+
+test('a chosen song is kept on the phone and a text file is turned away', async ({ page }) => {
+  await page.goto('/fitmama/#/settings');
+  const input = page.getByLabel('Choose an audio file');
+  await input.setInputFiles({
+    name: 'notes.txt',
+    mimeType: 'text/plain',
+    buffer: Buffer.from('not a song'),
+  });
+  await expect(page.getByRole('status')).toHaveText(UNPLAYABLE_SONG);
+  await expect(page.getByText('notes.txt')).toHaveCount(0);
+
+  await input.setInputFiles('e2e/fixtures/lullaby.wav');
+  await expect(page.getByText('lullaby.wav')).toBeVisible();
+  await page.reload();
+  await expect(page.getByRole('heading', { name: 'Profile' })).toBeVisible();
+  await expect(page.getByText('lullaby.wav')).toBeVisible();
 });
 
 test('finishing a day saves the result and unlocks the next day', async ({ page }) => {

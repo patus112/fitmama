@@ -4,6 +4,7 @@ import { music, unlockAudio } from '../audio/engine';
 import { GameClock } from '../audio/clock';
 import { SoundControl } from '../components/SoundControl';
 import { sessionsToCsv, sessionsToJson } from '../domain/exportData';
+import { songAcceptAttribute } from '../domain/songFile';
 import { TRACKS, resolveBpm } from '../domain/tracks';
 import { downloadText } from '../lib/download';
 import { useAppState } from '../state/AppState';
@@ -72,6 +73,7 @@ export function SettingsScreen() {
   }
 
   const stamp = format(new Date(), 'yyyy-MM-dd');
+  const songAccept = songAcceptAttribute(navigator.userAgent, navigator.platform, navigator.maxTouchPoints);
 
   return (
     <div className="screen">
@@ -117,12 +119,12 @@ export function SettingsScreen() {
 
       <section className="card">
         <h2>Your own song</h2>
-        <p className="help">Pick an audio file from this phone. Nothing is uploaded. Set the tempo so the arrows match.</p>
+        <p className="help">Pick a song from this phone, including one you downloaded. Nothing is uploaded. Set the tempo so the arrows match.</p>
         <label className="file-btn">
           Choose an audio file
           <input
             type="file"
-            accept="audio/*"
+            accept={songAccept}
             onChange={(event) => {
               const file = event.target.files?.[0];
               event.target.value = '';

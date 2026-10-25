@@ -1,5 +1,7 @@
 import { createContext, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { music, unlockAudio } from '../audio/engine';
+import { probePlayable } from '../audio/probeSong';
+import { UNPLAYABLE_SONG } from '../domain/songFile';
 import {
   clearCustomAudio,
   loadCustomAudio,
@@ -124,11 +126,19 @@ export function AppProvider({ children }: { children: ReactNode }) {
           return;
         }
         const url = URL.createObjectURL(file);
+        unlockAudio();
+        const previous = music.holdFile(url);
+        setNotice('Checking that song…');
+        const playable = await probePlayable(file);
+        if (!playable) {
+          music.releaseFile(previous);
+          URL.revokeObjectURL(url);
+          setNotice(UNPLAYABLE_SONG);
+          return;
+        }
         replaceUrl(url);
         setCustomName(file.name);
         persist({ trackId: 'custom' });
-        unlockAudio();
-        music.armFile(url, false);
         try {
           await saveCustomAudio(file, file.name);
           setNotice(null);
