@@ -9,7 +9,7 @@ A calm, offline rhythm-workout PWA for days when the couch or the bed is the gym
 - `npm run e2e` — Playwright flow and axe checks
 - `npm run build` — static build with the PWA manifest
 
-The app is ready for a later GitHub Pages deploy under `/fitmama/`. This repo does not publish it.
+The production build uses the `/fitmama/` base. Publishing is a separate manual workflow, Deploy Fit Mama. It does not run on pull requests, and its deploy job stays skipped until the repository variable `FITMAMA_DEPLOY_APPROVED` is `true`.
 
 ## Privacy
 
