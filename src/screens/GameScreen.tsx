@@ -310,7 +310,7 @@ function LiveGame({
       </header>
 
       <div className="stage">
-        <p className={`cue ${cue}`}>
+        <p className={`cue ${cue}`} data-testid="cue">
           {cue === 'up' ? <ArrowUp size={14} aria-hidden="true" /> : <ArrowDown size={14} aria-hidden="true" />}
           {cue === 'up' ? 'Hips up' : 'Hips down'}
         </p>

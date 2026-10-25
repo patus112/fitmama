@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { EighthNote, Volume2, VolumeX } from 'lucide-react';
 import { trackLabel } from '../domain/tracks';
 import { useAppState } from '../state/AppState';
@@ -8,6 +8,12 @@ export function SoundControl({ variant = 'menu' }: { variant?: 'menu' | 'inline'
   const [open, setOpen] = useState(false);
   const percent = Math.round(settings.volume * 100);
   const label = trackLabel(settings.trackId, settings.customBpm, customName);
+
+  useEffect(() => {
+    if (!open) return;
+    const timer = window.setTimeout(() => setOpen(false), 4500);
+    return () => window.clearTimeout(timer);
+  }, [open, percent, settings.muted]);
 
   const mute = (
     <button
@@ -61,7 +67,7 @@ export function SoundControl({ variant = 'menu' }: { variant?: 'menu' | 'inline'
         <EighthNote size={20} aria-hidden="true" />
       </button>
       {open ? (
-        <div className="sound-pop">
+        <div className="sound-pop" data-testid="volume-popover">
           {mute}
           {slider}
           <p>{label}</p>

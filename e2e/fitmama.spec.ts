@@ -1,6 +1,13 @@
 import AxeBuilder from '@axe-core/playwright';
 import { expect, test, type Page } from '@playwright/test';
 
+function boxesOverlap(
+  a: { x: number; y: number; width: number; height: number },
+  b: { x: number; y: number; width: number; height: number },
+) {
+  return a.x < b.x + b.width && a.x + a.width > b.x && a.y < b.y + b.height && a.y + a.height > b.y;
+}
+
 async function expectNoAxeViolations(page: Page) {
   const results = await new AxeBuilder({ page }).analyze();
   expect(
@@ -58,7 +65,21 @@ test('finishing a day saves the result and unlocks the next day', async ({ page 
   await page.goto('/fitmama/?fast=1#/plan');
   await page.getByTestId('start-day').click();
   await page.setViewportSize({ width: 844, height: 390 });
-  await expect(page.getByText('Get ready')).toBeVisible();
+  await expect(page.getByTestId('pause')).toBeVisible();
+  await page.getByTestId('music-button').click();
+  const popover = page.getByTestId('volume-popover');
+  await expect(popover).toBeVisible();
+  const popBox = await popover.boundingBox();
+  const cueBox = await page.getByTestId('cue').boundingBox();
+  const characterBox = await page.locator('.character').boundingBox();
+  expect(popBox).toBeTruthy();
+  expect(cueBox).toBeTruthy();
+  expect(characterBox).toBeTruthy();
+  if (popBox && cueBox && characterBox) {
+    expect(boxesOverlap(popBox, cueBox)).toBe(false);
+    expect(boxesOverlap(popBox, characterBox)).toBe(false);
+  }
+  await expect(popover).toBeHidden({ timeout: 8_000 });
   await expect(page.getByTestId('results')).toBeVisible({ timeout: 30_000 });
   const score = Number((await page.getByTestId('results-score').innerText()).replaceAll(',', ''));
   expect(score).toBeGreaterThan(0);
@@ -116,8 +137,9 @@ test('capture mobile screens @screenshots', async ({ page }) => {
   await page.goto('/fitmama/#/plan');
   await page.getByTestId('start-day').click();
   await page.setViewportSize({ width: 844, height: 390 });
-  await expect(page.getByText('Get ready')).toBeVisible();
-  await page.getByTestId('music-button').click();
+  await expect(page.getByTestId('pause')).toBeVisible({ timeout: 12_000 });
+  await expect(page.getByTestId('volume-popover')).toHaveCount(0);
+  await expect(page.getByTestId('cue')).toBeVisible();
   await expect
     .poll(
       async () => {
@@ -129,7 +151,7 @@ test('capture mobile screens @screenshots', async ({ page }) => {
       { timeout: 120_000 },
     )
     .toBeLessThan(136);
-  await page.screenshot({ path: `${out}/screenshot_game.png` });
+  await page.screenshot({ path: `${out}/screenshot_game_cue.png` });
 
   await expect(page.getByTestId('results')).toBeVisible({ timeout: 240_000 });
   await page.setViewportSize({ width: 390, height: 844 });
@@ -138,5 +160,29 @@ test('capture mobile screens @screenshots', async ({ page }) => {
   await page.goto('/fitmama/#/progress');
   await expect(page.getByTestId('progress-streak')).toBeVisible();
   await page.screenshot({ path: `${out}/screenshot_progress.png` });
+});
+
+test('capture the game with the cue clear @screenshots', async ({ page }) => {
+  test.setTimeout(90_000);
+  const out = process.env.SHOT_DIR ?? '/opt/cursor/artifacts';
+  await page.setViewportSize({ width: 844, height: 390 });
+  await page.goto('/fitmama/#/plan');
+  await page.getByTestId('start-day').click();
+  await page.setViewportSize({ width: 844, height: 390 });
+  await expect(page.getByTestId('pause')).toBeVisible({ timeout: 12_000 });
+  await expect(page.getByTestId('volume-popover')).toHaveCount(0);
+  await expect(page.getByTestId('cue')).toBeVisible();
+  await expect
+    .poll(
+      async () => {
+        const text = (await page.getByTestId('timer').innerText()).trim();
+        const match = /(\d+):(\d+)/.exec(text);
+        if (!match?.[1] || !match[2]) return 9999;
+        return Number(match[1]) * 60 + Number(match[2]);
+      },
+      { timeout: 60_000 },
+    )
+    .toBeLessThan(168);
+  await page.screenshot({ path: `${out}/screenshot_game_cue.png` });
 });
 });
