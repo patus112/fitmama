@@ -1,10 +1,8 @@
-import { Activity, ChartColumn, Map, User } from 'lucide-react';
+import { Activity, Play } from 'lucide-react';
 
 const TABS = [
-  { name: 'plan', href: '#/plan', label: 'Plan', icon: Map },
-  { name: 'exercises', href: '#/exercises', label: 'Exercises', icon: Activity },
-  { name: 'progress', href: '#/progress', label: 'Progress', icon: ChartColumn },
-  { name: 'settings', href: '#/settings', label: 'Profile', icon: User },
+  { name: 'plan', href: '#/plan', label: 'Game', icon: Play },
+  { name: 'exercises', href: '#/exercises', label: 'Library', icon: Activity },
 ] as const;
 
 export function TabBar({ current }: { current: string }) {

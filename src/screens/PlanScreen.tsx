@@ -1,7 +1,10 @@
 import { useEffect, useState } from 'react';
 import { Check, Flame, Leaf, Lock, Play, Star } from 'lucide-react';
 import { music, unlockAudio } from '../audio/engine';
+import { QuietLinks } from '../components/QuietLinks';
+import { exerciseById } from '../domain/catalog';
 import { formatPoints } from '../domain/format';
+import { blocksForDay, plannedDay } from '../domain/generator';
 import {
   DAYS_PER_PHASE,
   PHASES,
@@ -61,7 +64,10 @@ export function PlanScreen() {
   return (
     <div className="screen screen-plan">
       <header className="top">
-        <p className="hello">Hi, take it easy today</p>
+        <div className="top-links">
+          <p className="hello">Hi, take it easy today</p>
+          <QuietLinks />
+        </div>
         <h1>My Plan</h1>
         <div className="chips">
           <span className="chip chip-flame" data-testid="streak">
@@ -108,6 +114,8 @@ export function PlanScreen() {
           </button>
         ))}
       </div>
+
+      {showCallout ? <TodayPlan zones={settings.zones} day={calloutDay} /> : null}
 
       <div className="path-wrap">
         <LeafMark className="leaf leaf-a" />
@@ -159,7 +167,11 @@ export function PlanScreen() {
           {showCallout ? (
             <aside className="callout" style={calloutStyle(calloutDay.day - 1)} data-testid="day-callout">
               <h2>{finished ? 'You finished this round' : dayTitle(calloutDay)}</h2>
-              <p>{finished ? 'Play the last day again whenever you want.' : '3 min · lying down'}</p>
+              <p>
+                {finished
+                  ? 'Play the last day again whenever you want.'
+                  : daySummary(settings.zones, calloutDay)}
+              </p>
               <a className="btn btn-coral" href={`#/game/${calloutDay.phaseIndex}/${calloutDay.day}`} data-testid="start-day" onClick={beginAudio}>
                 <Play size={18} fill="#3B2A24" aria-hidden="true" />
                 Start
@@ -173,6 +185,38 @@ export function PlanScreen() {
         </div>
       </div>
     </div>
+  );
+}
+
+function daySummary(zones: readonly string[], day: DayRef): string {
+  const planned = plannedDay(zones, day);
+  const total = (planned?.blocks ?? []).reduce((sum, block) => sum + block.seconds, 0);
+  const minutes = Math.max(1, Math.round(total / 60));
+  return planned?.light ? `${minutes} min · light day` : `${minutes} min`;
+}
+
+function blockLength(seconds: number): string {
+  if (seconds < 90) return `${seconds}s`;
+  return `${Math.max(1, Math.round(seconds / 60))} min`;
+}
+
+function TodayPlan({ zones, day }: { zones: readonly string[]; day: DayRef }) {
+  const planned = plannedDay(zones, day);
+  const blocks = blocksForDay(zones, day);
+  if (!planned || blocks.length === 0) return null;
+  return (
+    <section className="card today-card" data-testid="today-plan">
+      <h2>{planned.light ? 'Light day' : 'Today'}</h2>
+      <p>{daySummary(zones, day)}. One calm breath is always in there.</p>
+      <ol className="today-moves">
+        {blocks.map((block, index) => (
+          <li key={`${block.exerciseId}-${index}`}>
+            <strong>{exerciseById(block.exerciseId)?.name ?? 'Move'}</strong>
+            <span>{blockLength(block.seconds)}</span>
+          </li>
+        ))}
+      </ol>
+    </section>
   );
 }
 

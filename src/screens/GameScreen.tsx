@@ -4,15 +4,19 @@ import { format } from 'date-fns';
 import { GameClock } from '../audio/clock';
 import { music, unlockAudio } from '../audio/engine';
 import { Character } from '../components/Character';
+import { PlaceholderArt } from '../components/PlaceholderArt';
 import { SoundControl } from '../components/SoundControl';
 import { SpeedPad } from '../components/SpeedPad';
-import { countdownFrom, gameSeconds } from '../config';
-import { exerciseById, GLUTE_BRIDGE_ID } from '../domain/catalog';
+import { blockPlaySeconds, countdownFrom } from '../config';
+import { exerciseById, type Exercise } from '../domain/catalog';
+import { blocksForDay } from '../domain/generator';
 import { TRAVEL_SECONDS, noteTravel, remainingUpMoves } from '../domain/chart';
 import { formatClock, formatPoints } from '../domain/format';
-import { canPlayDay, dayKey, dayTitle, isValidDay } from '../domain/plan';
+import { canPlayDay, completedDayKeys, dayKey, dayTitle, frontierDay, isValidDay } from '../domain/plan';
+import { type BlockResult } from '../domain/play';
 import { activeDirection, poseAt } from '../domain/pose';
 import { advanceScore, comboMessage, initialScore, type ScoreState } from '../domain/scoring';
+import { CalmPlay } from './CalmPlay';
 import {
   SPEED_MAX,
   buildBeatChart,
@@ -37,15 +41,8 @@ interface Pop {
 }
 
 export function GameScreen({ phaseIndex, day }: { phaseIndex: number; day: number }) {
-  const { settings, sessions, customUrl, customName, detectedBpm, beatOffset, refreshSessions, setSongSpeed } =
-    useAppState();
-  const reduce = useReducedMotion();
+  const { sessions } = useAppState();
   const ref = { phaseIndex, day };
-  const allowed = isValidDay(ref) && canPlayDay(ref, sessions);
-  const bridge = exerciseById(GLUTE_BRIDGE_ID);
-  const songBpm = resolveSongBpm(settings.trackId, settings.customBpm, detectedBpm, settings.bpmManual);
-  const speed = settings.speeds[settings.trackId] ?? 1;
-  const offset = resolveBeatOffset(settings.trackId, settings.bpmManual, beatOffset);
 
   if (!isValidDay(ref)) {
     return (
@@ -58,7 +55,7 @@ export function GameScreen({ phaseIndex, day }: { phaseIndex: number; day: numbe
     );
   }
 
-  if (!allowed) {
+  if (!canPlayDay(ref, sessions)) {
     return (
       <div className="results">
         <h1>This day opens after the earlier ones</h1>
@@ -70,35 +67,136 @@ export function GameScreen({ phaseIndex, day }: { phaseIndex: number; day: numbe
     );
   }
 
-  return (
-    <LiveGame
-      phaseIndex={phaseIndex}
-      day={day}
-      songBpm={songBpm}
-      speed={speed}
-      beatOffset={offset}
-      minRep={bridge?.minRepSeconds ?? 2}
-      maxRep={bridge?.maxRepSeconds ?? 4}
-      songTitle={songName(settings.trackId, customName)}
-      trackId={settings.trackId}
-      volume={settings.volume}
-      muted={settings.muted}
-      reduce={reduce}
-      customUrl={customUrl}
-      onSpeed={setSongSpeed}
-      refreshSessions={refreshSessions}
-    />
-  );
+  return <PlayQueue phaseIndex={phaseIndex} day={day} />;
+}
+
+export function PracticeScreen({ id }: { id: string }) {
+  const exercise = exerciseById(id);
+  if (!exercise) {
+    return (
+      <div className="results">
+        <h1>That move is not in the library</h1>
+        <a className="btn btn-coral" href="#/exercises">
+          Back to the library
+        </a>
+      </div>
+    );
+  }
+  return <PlayQueue practiceId={exercise.id} />;
+}
+
+function PlayQueue({
+  phaseIndex,
+  day,
+  practiceId,
+}: {
+  phaseIndex?: number;
+  day?: number;
+  practiceId?: string;
+}) {
+  const { settings, sessions, customUrl, customName, detectedBpm, beatOffset, refreshSessions, setSongSpeed } =
+    useAppState();
+  const reduce = useReducedMotion();
+  const practice = practiceId ? exerciseById(practiceId) : undefined;
+  const planned =
+    practice
+      ? [{ exerciseId: practice.id, seconds: Math.min(180, Math.max(practice.defaultSeconds, 60)) }]
+      : blocksForDay(settings.zones, { phaseIndex: phaseIndex ?? 0, day: day ?? 1 });
+  const [index, setIndex] = useState(0);
+  const [carry, setCarry] = useState(() => initialScore());
+  const logRef = useRef<{ exerciseId: string; seconds: number }[]>([]);
+  const indexRef = useRef(0);
+  const startedAt = useRef(new Date());
+  indexRef.current = index;
+  const block = planned[index];
+  const exercise = block ? exerciseById(block.exerciseId) : undefined;
+  const songBpm = resolveSongBpm(settings.trackId, settings.customBpm, detectedBpm, settings.bpmManual);
+  const speed = settings.speeds[settings.trackId] ?? 1;
+  const offset = resolveBeatOffset(settings.trackId, settings.bpmManual, beatOffset);
+  const playSeconds = block ? blockPlaySeconds(block.seconds, planned.length) : 1;
+
+  async function onDone(result: BlockResult): Promise<'next' | 'saved'> {
+    const current = exercise;
+    if (!current) return 'saved';
+    const exercisesDone = [...logRef.current, { exerciseId: current.id, seconds: result.seconds }];
+    const finishedPractice = Boolean(practiceId);
+    const more = result.completed && !finishedPractice && indexRef.current + 1 < planned.length;
+    if (more) {
+      logRef.current = exercisesDone;
+      setCarry(result.state);
+      setIndex(indexRef.current + 1);
+      return 'next';
+    }
+    const totalSeconds = exercisesDone.reduce((sum, item) => sum + item.seconds, 0);
+    const frontier = frontierDay(completedDayKeys(sessions));
+    const id = await addSession({
+      date: format(startedAt.current, 'yyyy-MM-dd'),
+      startedAt: startedAt.current.toISOString(),
+      exercises: exercisesDone,
+      totalSeconds,
+      score: result.state.score,
+      maxCombo: result.state.maxCombo,
+      completed: result.completed && !finishedPractice,
+      dayKey: dayKey(
+        finishedPractice || phaseIndex === undefined || day === undefined ? frontier : { phaseIndex, day },
+      ),
+    });
+    await refreshSessions();
+    window.location.hash = `#/results/${id}`;
+    return 'saved';
+  }
+
+  if (!exercise || !block) {
+    return (
+      <div className="results">
+        <h1>This day has no moves yet</h1>
+        <a className="btn btn-coral" href="#/settings">
+          Choose zones
+        </a>
+      </div>
+    );
+  }
+
+  const shared = {
+    exercise,
+    playSeconds,
+    songBpm,
+    speed,
+    songTitle: songName(settings.trackId, customName),
+    trackId: settings.trackId,
+    volume: settings.volume,
+    muted: settings.muted,
+    customUrl,
+    onSpeed: setSongSpeed,
+    opening: carry,
+    skipCountdown: index > 0,
+    onDone,
+  };
+
+  if (exercise.mode === 'rep') {
+    return (
+      <LiveGame
+        key={exercise.id + index}
+        phaseIndex={phaseIndex ?? 0}
+        day={day ?? 1}
+        beatOffset={offset}
+        reduce={reduce}
+        {...shared}
+      />
+    );
+  }
+
+  return <CalmPlay key={exercise.id + index} {...shared} />;
 }
 
 function LiveGame({
   phaseIndex,
   day,
+  exercise,
+  playSeconds,
   songBpm,
   speed,
   beatOffset,
-  minRep,
-  maxRep,
   songTitle,
   trackId,
   volume,
@@ -106,15 +204,17 @@ function LiveGame({
   reduce,
   customUrl,
   onSpeed,
-  refreshSessions,
+  opening,
+  skipCountdown,
+  onDone,
 }: {
   phaseIndex: number;
   day: number;
+  exercise: Exercise;
+  playSeconds: number;
   songBpm: number;
   speed: number;
   beatOffset: number;
-  minRep: number;
-  maxRep: number;
   songTitle: string;
   trackId: string;
   volume: number;
@@ -122,10 +222,12 @@ function LiveGame({
   reduce: boolean;
   customUrl: string | null;
   onSpeed: (speed: number) => void;
-  refreshSessions: () => Promise<void>;
+  opening: ScoreState;
+  skipCountdown: boolean;
+  onDone: (result: BlockResult) => Promise<'next' | 'saved'>;
 }) {
-  const duration = gameSeconds();
-  const plan = planRep(songBpm, speed, { minSeconds: minRep, maxSeconds: maxRep });
+  const duration = playSeconds;
+  const plan = planRep(songBpm, speed, { minSeconds: exercise.minRepSeconds, maxSeconds: exercise.maxRepSeconds });
   const songDuration = duration * SPEED_MAX + 8;
   const [fileDuration, setFileDuration] = useState<number | null>(null);
   const [chart, setChart] = useState<BeatNote[]>(() =>
@@ -139,14 +241,15 @@ function LiveGame({
     }),
   );
   const [anchors, setAnchors] = useState<TempoAnchor[]>([{ realTime: 0, songTime: 0, rate: speed }]);
-  const [mode, setMode] = useState<Mode>('countdown');
+  const [mode, setMode] = useState<Mode>(skipCountdown ? 'play' : 'countdown');
   const [count, setCount] = useState(() => countdownFrom());
-  const [hud, setHud] = useState({ now: 0, score: 0, combo: 1, maxCombo: 0 });
+  const [hud, setHud] = useState({ now: 0, score: opening.score, combo: opening.combo, maxCombo: opening.maxCombo });
   const [pops, setPops] = useState<Pop[]>([]);
   const [flash, setFlash] = useState(false);
   const [movesLeft, setMovesLeft] = useState(0);
   const [saveError, setSaveError] = useState<string | null>(null);
-  const scoreRef = useRef<ScoreState>(initialScore());
+  const scoreRef = useRef<ScoreState>(opening);
+  const onDoneRef = useRef(onDone);
   const nowRef = useRef(0);
   const clockRef = useRef<GameClock | null>(null);
   const chartRef = useRef<BeatNote[]>(chart);
@@ -165,6 +268,7 @@ function LiveGame({
   songRef.current = { songBpm, beatOffset, beatsPerRep: plan.beatsPerRep, fileDuration };
   customRef.current = customUrl;
   audioRef.current = { volume, muted, trackId };
+  onDoneRef.current = onDone;
 
   const finishRef = useRef<(completed: boolean) => Promise<void>>(async () => {});
   finishRef.current = async (completed: boolean) => {
@@ -175,18 +279,8 @@ function LiveGame({
     setMode('saving');
     const seconds = Math.round(Math.min(duration, Math.max(0, clockRef.current?.now() ?? nowRef.current)));
     try {
-      const id = await addSession({
-        date: format(new Date(), 'yyyy-MM-dd'),
-        startedAt: new Date(Date.now() - seconds * 1000).toISOString(),
-        exercises: [{ exerciseId: GLUTE_BRIDGE_ID, seconds }],
-        totalSeconds: seconds,
-        score: scoreRef.current.score,
-        maxCombo: scoreRef.current.maxCombo,
-        completed,
-        dayKey: dayKey({ phaseIndex, day }),
-      });
-      await refreshSessions();
-      window.location.hash = `#/results/${id}`;
+      const outcome = await onDoneRef.current({ state: scoreRef.current, seconds, completed });
+      if (outcome === 'next') return;
     } catch {
       finishing.current = false;
       setSaveError('Could not save on this phone. Nothing left the device.');
@@ -447,12 +541,12 @@ function LiveGame({
       <div className="stage">
         <p className={`cue ${cue}`} data-testid="cue">
           {cue === 'up' ? <ArrowUp size={14} aria-hidden="true" /> : <ArrowDown size={14} aria-hidden="true" />}
-          {cue === 'up' ? 'Hips up' : 'Hips down'}
+          {cue === 'up' ? exercise.cueUp : exercise.cueDown}
         </p>
         <p className="tempo-feel" data-testid="tempo-feel">
           {plan.feel}
         </p>
-        <Character pose={pose} />
+        {exercise.hasCharacter ? <Character pose={pose} /> : <PlaceholderArt compact />}
         <div className="pops">
           {pops.map((pop) => (
             <div key={pop.id} className="pop" data-testid="perfect-pop">

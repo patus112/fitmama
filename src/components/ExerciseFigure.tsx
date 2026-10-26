@@ -1,33 +1,33 @@
 import type { Exercise } from '../domain/catalog';
 import { exercisePhotos } from '../media';
 import { Character } from './Character';
+import { PlaceholderArt } from './PlaceholderArt';
 
 export function ExerciseFigure({ exercise, pose = 0 }: { exercise: Exercise; pose?: number }) {
   if (exercise.hasCharacter) {
     return (
-      <div className="hero hero-character">
+      <div className="hero hero-character" data-image={exercise.image}>
         <Character pose={pose} />
       </div>
     );
   }
-  const photo = exercisePhotos[exercise.id];
+  const photo = exercise.image.startsWith('placeholders/') ? undefined : exercisePhotos[exercise.id];
   if (photo) {
     return (
-      <div className="hero hero-photo">
+      <div className="hero hero-photo" data-image={exercise.image}>
         <img src={photo} alt="" />
       </div>
     );
   }
   return (
-    <div className="hero hero-placeholder" aria-hidden="true">
-      <div className="mat" />
-      <p>{exercise.position}</p>
+    <div className="hero hero-placeholder" data-image={exercise.image}>
+      <PlaceholderArt />
     </div>
   );
 }
 
 export function ExerciseThumb({ exercise }: { exercise: Exercise }) {
-  const photo = exercisePhotos[exercise.id];
+  const photo = exercise.image.startsWith('placeholders/') ? undefined : exercisePhotos[exercise.id];
   if (exercise.hasCharacter) {
     return (
       <span className="thumb thumb-character" aria-hidden="true">
@@ -37,8 +37,8 @@ export function ExerciseThumb({ exercise }: { exercise: Exercise }) {
   }
   if (photo) return <img className="thumb" src={photo} alt="" />;
   return (
-    <span className="thumb thumb-placeholder" aria-hidden="true">
-      {exercise.position === 'Lying down' ? 'Lie' : exercise.position.split(' ')[0]}
+    <span className="thumb thumb-placeholder" aria-hidden="true" data-image={exercise.image}>
+      <PlaceholderArt compact />
     </span>
   );
 }

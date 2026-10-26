@@ -9,6 +9,8 @@ import { exerciseById, GLUTE_BRIDGE_ID } from '../domain/catalog';
 import { planRep } from '../domain/tempo';
 import { TRACKS, clampBpm, resolveSongBpm } from '../domain/tracks';
 import { SpeedPad } from '../components/SpeedPad';
+import { QuietLinks } from '../components/QuietLinks';
+import { DISCLAIMER, ZONES, type ZoneId } from '../domain/zones';
 import { downloadText } from '../lib/download';
 import { useAppState } from '../state/AppState';
 
@@ -27,9 +29,32 @@ export function SettingsScreen() {
     setSongSpeed,
     saveCustomFile,
     removeCustomFile,
+    setZones,
   } = useAppState();
   const taps = useRef<number[]>([]);
   const [tapHint, setTapHint] = useState('Tap the beat a few times');
+  const [draft, setDraft] = useState<ZoneId[]>(settings.zones);
+  const [zoneError, setZoneError] = useState<string | null>(null);
+  const zoneKey = settings.zones.join('|');
+  const [seenZones, setSeenZones] = useState(zoneKey);
+  if (seenZones !== zoneKey) {
+    setSeenZones(zoneKey);
+    setDraft(settings.zones);
+  }
+
+  function toggleZone(id: ZoneId) {
+    setDraft((current) => (current.includes(id) ? current.filter((zone) => zone !== id) : [...current, id]));
+  }
+
+  async function rebuild() {
+    if (draft.length === 0) return;
+    try {
+      await setZones(draft);
+      setZoneError(null);
+    } catch {
+      setZoneError('Could not save that on this phone.');
+    }
+  }
 
   function preview() {
     unlockAudio();
@@ -93,10 +118,43 @@ export function SettingsScreen() {
   return (
     <div className="screen">
       <header className="top block-top">
-        <p className="hello">On this phone only</p>
+        <div className="top-links">
+          <p className="hello">On this phone only</p>
+          <QuietLinks />
+        </div>
         <h1>Profile</h1>
       </header>
-      <p className="lede">No account, no cloud. Volume, songs, and sessions stay here.</p>
+      <p className="lede">No account, no cloud. Volume, songs, zones, and sessions stay here.</p>
+      <section className="card">
+        <h2>Zones</h2>
+        <p className="help">Change these and the 28-day plan rebuilds. Finished days stay finished.</p>
+        <div className="zone-grid" role="group" aria-label="Zones">
+          {ZONES.map((zone) => {
+            const on = draft.includes(zone.id);
+            return (
+              <button
+                key={zone.id}
+                type="button"
+                className={on ? 'zone-pick on' : 'zone-pick'}
+                aria-pressed={on}
+                onClick={() => toggleZone(zone.id)}
+              >
+                <span>{zone.name}</span>
+                <small>{zone.hint}</small>
+              </button>
+            );
+          })}
+        </div>
+        {zoneError ? (
+          <p className="notice" role="status">
+            {zoneError}
+          </p>
+        ) : null}
+        <button type="button" className="btn btn-coral" disabled={draft.length === 0} onClick={() => void rebuild()}>
+          Rebuild my plan
+        </button>
+        <p className="disclaimer">{DISCLAIMER}</p>
+      </section>
       {notice ? (
         <p className="notice" role="status">
           {notice}
@@ -208,7 +266,6 @@ export function SettingsScreen() {
         </div>
       </section>
 
-      <p className="footnote">Fit Mama is a gentle practice, not medical advice. Stop if something hurts.</p>
     </div>
   );
 }

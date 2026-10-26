@@ -26,6 +26,14 @@ export function gameSeconds(): number {
   return isFastMode() ? FAST_GAME_SECONDS : GAME_SECONDS;
 }
 
+/** Real days are 10–20 minutes split across blocks. Fast mode keeps the whole day near 12 seconds. */
+export function blockPlaySeconds(plannedSeconds: number, blockCount: number): number {
+  const planned = Number.isFinite(plannedSeconds) ? Math.max(1, Math.round(plannedSeconds)) : 1;
+  if (!isFastMode()) return planned;
+  const count = Math.max(1, Math.floor(blockCount));
+  return Math.max(6, Math.round(FAST_GAME_SECONDS / count));
+}
+
 export function countdownFrom(): number {
   return isFastMode() ? FAST_COUNTDOWN_FROM : COUNTDOWN_FROM;
 }
