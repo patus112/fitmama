@@ -38,10 +38,22 @@ describe('frame direction', () => {
     expect(orientPose('glute-bridge', up)).toBeCloseTo(0, 5);
     expect(shownPose('glute-bridge', up)).toBeCloseTo(0, 5);
     expect(orientPose('glute-bridge', 0)).toBeCloseTo(1, 5);
-    expect(orientPose('heel-slides', 1)).toBe(0);
     expect(orientPose('ankle-pumps', 1)).toBe(0);
     expect(orientPose('squat-dumbbell', 1)).toBe(1);
     expect(orientPose('neck-tilt', 1)).toBe(1);
+  });
+
+  it('shows frame B on the active cue for the replaced pairs', () => {
+    const up = repPose(notes, 1);
+    for (const id of ['heel-slides', 'shoulder-rolls', 'belly-draw-in']) {
+      expect(orientPose(id, up)).toBe(1);
+    }
+    expect(orientPose('jaw-jut', holdPose(0.5, 8, 2))).toBe(1);
+    expect(orientPose('tongue-press', holdPose(0.5, 8, 2))).toBe(1);
+    expect(orientPose('short-plank', holdPose(4, 30, 0))).toBe(1);
+    expect(orientPose('breath-46', breathPose('inhale', 1))).toBe(1);
+    expect(orientPose('humming-breath', breathPose('exhale', 1))).toBe(1);
+    expect(orientPose('humming-breath', breathPose('inhale', 1))).toBe(0);
   });
 });
 

@@ -17,10 +17,11 @@ export const SUBTLE_FRAME_IDS = new Set([
 /**
  * Drawings where frame A is the up / active pose and frame B is the return.
  * The chart eases toward 1 on the up cue, so these play as 1 − pose.
+ * Humming breath is the exception that is not a rep: the hum is the exhale,
+ * and the breath clock would show frame A on the way out.
  */
 export const REVERSED_FRAME_IDS = new Set([
   'glute-bridge',
-  'heel-slides',
   'dead-bug',
   'bird-dog',
   'side-leg-raise',
@@ -28,11 +29,9 @@ export const REVERSED_FRAME_IDS = new Set([
   'alternating-leg-raises',
   'knees-to-chest',
   'knee-rocks',
-  'shoulder-rolls',
   'ankle-pumps',
-  'jaw-jut',
-  'tongue-press',
   'vowel-faces',
+  'humming-breath',
 ]);
 
 /** How long a pose takes to replace the other one. The rest of the rep holds. */
