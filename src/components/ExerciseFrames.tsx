@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import type { Exercise } from '../domain/catalog';
-import { idleHalfSeconds, isSubtleFrame } from '../domain/frames';
+import { frameOpacities, isSubtleFrame } from '../domain/frames';
 import { useReducedMotion } from '../hooks/useReducedMotion';
 import { exerciseFrames } from '../media';
 
@@ -60,7 +60,7 @@ export function ExerciseFrames({
   if (!pair) return null;
 
   const thumb = className.split(/\s+/).includes('thumb');
-  const half = idleHalfSeconds(exercise.id, exercise.tempoSeconds, thumb);
+  const swap = driven && !still ? frameOpacities(pose) : null;
   const classes = [
     'frame-stack',
     driven ? 'frame-driven' : 'frame-idle',
@@ -72,15 +72,15 @@ export function ExerciseFrames({
     .join(' ');
 
   return (
-    <span
-      ref={ref}
-      className={classes}
-      data-testid={testId}
-      style={{ ['--frame-half' as string]: `${half}s` }}
-    >
-      <img className={thumb ? 'frame-a thumb' : 'frame-a'} src={pair.a} alt="" />
+    <span ref={ref} className={classes} data-testid={testId}>
+      <img
+        className={thumb ? 'frame-a thumb' : 'frame-a'}
+        src={pair.a}
+        alt=""
+        style={swap ? { opacity: swap.a } : undefined}
+      />
       {still ? null : (
-        <img className="frame-b" src={pair.b} alt="" style={driven ? { opacity: pose } : undefined} />
+        <img className="frame-b" src={pair.b} alt="" style={swap ? { opacity: swap.b } : undefined} />
       )}
     </span>
   );

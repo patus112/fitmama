@@ -13,7 +13,7 @@ import { TRAVEL_SECONDS, noteTravel, remainingUpMoves } from '../domain/chart';
 import { formatClock, formatPoints } from '../domain/format';
 import { canPlayDay, completedDayKeys, dayKey, dayTitle, frontierDay, isValidDay } from '../domain/plan';
 import { type BlockResult } from '../domain/play';
-import { poseAmount, repPose } from '../domain/frames';
+import { repPose, shownPose } from '../domain/frames';
 import { activeDirection } from '../domain/pose';
 import { advanceScore, comboMessage, initialScore, type ScoreState } from '../domain/scoring';
 import { CalmPlay } from './CalmPlay';
@@ -501,7 +501,7 @@ function LiveGame({
   const live = projectNotes(chart, anchors);
   const travel = TRAVEL_SECONDS;
   const cue = activeDirection(live, hud.now);
-  const pose = reduce ? 0 : poseAmount(exercise.id, repPose(live, hud.now));
+  const pose = reduce ? 0 : shownPose(exercise.id, repPose(live, hud.now));
   const remaining = Math.max(0, duration - hud.now);
   const title = dayTitle({ phaseIndex, day });
 
