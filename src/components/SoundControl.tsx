@@ -3,11 +3,11 @@ import { EighthNote, Volume2, VolumeX } from 'lucide-react';
 import { trackLabel } from '../domain/tracks';
 import { useAppState } from '../state/AppState';
 
-export function SoundControl({ variant = 'menu' }: { variant?: 'menu' | 'inline' }) {
+export function SoundControl({ variant = 'menu', caption }: { variant?: 'menu' | 'inline'; caption?: string }) {
   const { settings, customName, setVolume, setMuted } = useAppState();
   const [open, setOpen] = useState(false);
   const percent = Math.round(settings.volume * 100);
-  const label = trackLabel(settings.trackId, settings.customBpm, customName);
+  const label = caption ?? trackLabel(settings.trackId, settings.customBpm, customName);
 
   useEffect(() => {
     if (!open) return;

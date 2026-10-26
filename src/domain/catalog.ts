@@ -17,9 +17,16 @@ export const exerciseSchema = z.object({
   commonMistakes: z.array(z.string().min(1)).min(2).max(3),
   defaultSeconds: z.number().int().positive().max(180),
   tempoSeconds: z.number().min(2).max(4),
+  minRepSeconds: z.number().min(2).max(4).optional(),
+  maxRepSeconds: z.number().min(2).max(4).optional(),
 });
 
-export type Exercise = z.infer<typeof exerciseSchema>;
+type ExerciseInput = z.infer<typeof exerciseSchema>;
+
+export type Exercise = ExerciseInput & {
+  minRepSeconds: number;
+  maxRepSeconds: number;
+};
 
 const rawExercises = [
   {
@@ -131,6 +138,8 @@ const rawExercises = [
     commonMistakes: ['Arching the lower back at the top', 'Rushing — keep it slow and calm'],
     defaultSeconds: 30,
     tempoSeconds: 3,
+    minRepSeconds: 2,
+    maxRepSeconds: 4,
   },
   {
     id: 'side-leg-raise',
@@ -332,7 +341,13 @@ const rawExercises = [
   },
 ];
 
-export const exercises: Exercise[] = z.array(exerciseSchema).parse(rawExercises);
+function withRepWindow(exercise: ExerciseInput): Exercise {
+  const minRepSeconds = exercise.minRepSeconds ?? (exercise.tempoSeconds >= 3.5 ? 3 : 2);
+  const maxRepSeconds = exercise.maxRepSeconds ?? 4;
+  return { ...exercise, minRepSeconds, maxRepSeconds };
+}
+
+export const exercises: Exercise[] = z.array(exerciseSchema).parse(rawExercises).map(withRepWindow);
 
 export const GLUTE_BRIDGE_ID = 'glute-bridge';
 

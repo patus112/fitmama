@@ -1,4 +1,5 @@
 import { createContext, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { detectTempoFromBlob } from '../audio/detectTempo';
 import { music, unlockAudio } from '../audio/engine';
 import { probePlayable } from '../audio/probeSong';
 import { UNPLAYABLE_SONG } from '../domain/songFile';
@@ -9,9 +10,12 @@ import {
   loadSessions,
   loadSettings,
   saveCustomAudio,
+  saveCustomSpeed,
+  saveDetectedTempo,
   saveSettings,
   setFavorite,
 } from '../data/db';
+import { clampSpeed } from '../domain/tempo';
 import { clampBpm, clampVolume, type TrackId } from '../domain/tracks';
 import { DEFAULT_SETTINGS, type SavedSession, type Settings } from '../domain/session';
 
@@ -25,12 +29,16 @@ interface AppStateValue {
   favorites: ReadonlySet<string>;
   customName: string | null;
   customUrl: string | null;
+  detectedBpm: number | null;
+  beatOffset: number;
+  beatMessage: string | null;
   notice: string | null;
   setNotice: (notice: string | null) => void;
   setVolume: (volume: number) => void;
   setMuted: (muted: boolean) => void;
   setTrack: (trackId: TrackId) => void;
   setCustomBpm: (bpm: number) => void;
+  setSongSpeed: (speed: number) => void;
   saveCustomFile: (file: File) => Promise<void>;
   removeCustomFile: () => Promise<void>;
   toggleFavorite: (exerciseId: string) => void;
@@ -47,9 +55,13 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [favorites, setFavorites] = useState<ReadonlySet<string>>(new Set());
   const [customName, setCustomName] = useState<string | null>(null);
   const [customUrl, setCustomUrl] = useState<string | null>(null);
+  const [detectedBpm, setDetectedBpm] = useState<number | null>(null);
+  const [beatOffset, setBeatOffset] = useState(0);
+  const [beatMessage, setBeatMessage] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const urlRef = useRef<string | null>(null);
   const settingsRef = useRef(settings);
+  const detectToken = useRef(0);
   settingsRef.current = settings;
 
   function replaceUrl(next: string | null) {
@@ -79,12 +91,26 @@ export function AppProvider({ children }: { children: ReactNode }) {
           loadCustomAudio(),
         ]);
         if (cancelled) return;
-        setSettings(storedSettings);
+        let next = storedSettings;
+        if (typeof audio?.speed === 'number') {
+          next = { ...next, speeds: { ...next.speeds, custom: clampSpeed(audio.speed) } };
+        }
+        settingsRef.current = next;
+        setSettings(next);
         setSessions(storedSessions);
         setFavorites(new Set(storedFavorites));
         if (audio) {
           setCustomName(audio.name);
           replaceUrl(URL.createObjectURL(audio.blob));
+          if (typeof audio.detectedBpm === 'number') {
+            setDetectedBpm(audio.detectedBpm);
+            setBeatOffset(audio.beatOffset ?? 0);
+            setBeatMessage(
+              next.bpmManual
+                ? `Using your tempo, ${next.customBpm} BPM.`
+                : `Beat found at ${Math.round(audio.detectedBpm)} BPM. The arrows follow it unless you set a tempo yourself.`,
+            );
+          }
         }
       } catch {
         if (!cancelled) {
@@ -114,12 +140,25 @@ export function AppProvider({ children }: { children: ReactNode }) {
       favorites,
       customName,
       customUrl,
+      detectedBpm,
+      beatOffset,
+      beatMessage,
       notice,
       setNotice,
       setVolume: (volume) => persist({ volume: clampVolume(volume) }),
       setMuted: (muted) => persist({ muted }),
       setTrack: (trackId) => persist({ trackId }),
-      setCustomBpm: (bpm) => persist({ customBpm: clampBpm(bpm) }),
+      setCustomBpm: (bpm) => {
+        const next = clampBpm(bpm);
+        persist({ customBpm: next, bpmManual: true });
+        setBeatMessage(`Using your tempo, ${next} BPM.`);
+      },
+      setSongSpeed: (speed) => {
+        const next = clampSpeed(speed);
+        const trackId = settingsRef.current.trackId;
+        persist({ speeds: { ...settingsRef.current.speeds, [trackId]: next } });
+        if (trackId === 'custom') void saveCustomSpeed(next);
+      },
       saveCustomFile: async (file) => {
         if (file.size > MAX_AUDIO_BYTES) {
           setNotice('That file is over 20 MB. A shorter song is easier to keep on this phone.');
@@ -138,17 +177,52 @@ export function AppProvider({ children }: { children: ReactNode }) {
         }
         replaceUrl(url);
         setCustomName(file.name);
-        persist({ trackId: 'custom' });
+        setDetectedBpm(null);
+        setBeatOffset(0);
+        persist({
+          trackId: 'custom',
+          bpmManual: false,
+          speeds: { ...settingsRef.current.speeds, custom: 1 },
+        });
         try {
           await saveCustomAudio(file, file.name);
           setNotice(null);
         } catch {
           setNotice('Could not keep that file on this phone.');
+          return;
+        }
+        const token = ++detectToken.current;
+        setBeatMessage('Finding the beat…');
+        try {
+          const estimate = await detectTempoFromBlob(file);
+          if (detectToken.current !== token) return;
+          if (!estimate?.confident) {
+            setBeatMessage('No clear beat in that song. Tap along or set the tempo.');
+            return;
+          }
+          await saveDetectedTempo(estimate.bpm, estimate.offsetSeconds);
+          if (detectToken.current !== token) return;
+          setDetectedBpm(estimate.bpm);
+          setBeatOffset(estimate.offsetSeconds);
+          if (!settingsRef.current.bpmManual) {
+            persist({ customBpm: clampBpm(estimate.bpm), bpmManual: false });
+          }
+          setBeatMessage(
+            `Beat found at ${estimate.bpm} BPM. The arrows follow it unless you set a tempo yourself.`,
+          );
+        } catch {
+          if (detectToken.current === token) {
+            setBeatMessage('Could not read a beat from that song. Tap along or set the tempo.');
+          }
         }
       },
       removeCustomFile: async () => {
+        detectToken.current += 1;
         await clearCustomAudio();
         setCustomName(null);
+        setDetectedBpm(null);
+        setBeatOffset(0);
+        setBeatMessage(null);
         replaceUrl(null);
         if (settingsRef.current.trackId === 'custom') persist({ trackId: 'sunday-stretch' });
       },
@@ -164,7 +238,19 @@ export function AppProvider({ children }: { children: ReactNode }) {
         setSessions(await loadSessions());
       },
     };
-  }, [ready, storageError, settings, sessions, favorites, customName, customUrl, notice]);
+  }, [
+    ready,
+    storageError,
+    settings,
+    sessions,
+    favorites,
+    customName,
+    customUrl,
+    detectedBpm,
+    beatOffset,
+    beatMessage,
+    notice,
+  ]);
 
   return <AppStateContext.Provider value={value}>{children}</AppStateContext.Provider>;
 }

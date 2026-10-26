@@ -26,6 +26,10 @@ describe('exercise catalog', () => {
     for (const exercise of exercises) {
       expect(exercise.tempoSeconds).toBeGreaterThanOrEqual(2);
       expect(exercise.tempoSeconds).toBeLessThanOrEqual(4);
+      expect(exercise.minRepSeconds).toBeGreaterThanOrEqual(2);
+      expect(exercise.maxRepSeconds).toBeLessThanOrEqual(4);
+      expect(exercise.minRepSeconds).toBeLessThanOrEqual(exercise.tempoSeconds);
+      expect(exercise.tempoSeconds).toBeLessThanOrEqual(exercise.maxRepSeconds);
     }
     const plank = exercises.find((exercise) => exercise.id === 'short-plank');
     expect(plank?.defaultSeconds).toBeLessThanOrEqual(30);

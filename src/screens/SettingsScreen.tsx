@@ -5,7 +5,10 @@ import { GameClock } from '../audio/clock';
 import { SoundControl } from '../components/SoundControl';
 import { sessionsToCsv, sessionsToJson } from '../domain/exportData';
 import { songAcceptAttribute } from '../domain/songFile';
-import { TRACKS, resolveBpm } from '../domain/tracks';
+import { exerciseById, GLUTE_BRIDGE_ID } from '../domain/catalog';
+import { planRep } from '../domain/tempo';
+import { TRACKS, clampBpm, resolveSongBpm } from '../domain/tracks';
+import { SpeedPad } from '../components/SpeedPad';
 import { downloadText } from '../lib/download';
 import { useAppState } from '../state/AppState';
 
@@ -15,10 +18,13 @@ export function SettingsScreen() {
     sessions,
     customName,
     customUrl,
+    detectedBpm,
+    beatMessage,
     notice,
     setNotice,
     setTrack,
     setCustomBpm,
+    setSongSpeed,
     saveCustomFile,
     removeCustomFile,
   } = useAppState();
@@ -36,7 +42,8 @@ export function SettingsScreen() {
     void music.preview({
       volume: settings.volume,
       muted: settings.muted,
-      bpm: resolveBpm(settings.trackId, settings.customBpm),
+      bpm: resolveSongBpm(settings.trackId, settings.customBpm, detectedBpm, settings.bpmManual),
+      rate: settings.speeds[settings.trackId],
       trackId: settings.trackId,
       customUrl,
       getTime: () => clock.now(),
@@ -66,11 +73,19 @@ export function SettingsScreen() {
       if (current !== undefined && previous !== undefined) intervals.push(current - previous);
     }
     const average = intervals.reduce((sum, value) => sum + value, 0) / intervals.length;
-    const bpm = Math.round(60000 / average);
+    const bpm = clampBpm(Math.round(60000 / average));
     setCustomBpm(bpm);
     setTrack('custom');
-    setTapHint(`Tempo set to ${Math.min(120, Math.max(40, bpm))} BPM`);
+    setTapHint(`Tempo set to ${bpm} BPM`);
   }
+
+  const bridge = exerciseById(GLUTE_BRIDGE_ID);
+  const songBpm = resolveSongBpm(settings.trackId, settings.customBpm, detectedBpm, settings.bpmManual);
+  const speed = settings.speeds[settings.trackId];
+  const feel = planRep(songBpm, speed, {
+    minSeconds: bridge?.minRepSeconds ?? 2,
+    maxSeconds: bridge?.maxRepSeconds ?? 4,
+  }).feel;
 
   const stamp = format(new Date(), 'yyyy-MM-dd');
   const songAccept = songAcceptAttribute(navigator.userAgent, navigator.platform, navigator.maxTouchPoints);
@@ -119,7 +134,9 @@ export function SettingsScreen() {
 
       <section className="card">
         <h2>Your own song</h2>
-        <p className="help">Pick a song from this phone, including one you downloaded. Nothing is uploaded. Set the tempo so the arrows match.</p>
+        <p className="help">
+          Pick a song from this phone, including one you downloaded. Nothing is uploaded. Fit Mama finds the beat on this phone. The slider and the taps still win if you set a tempo yourself.
+        </p>
         <label className="file-btn">
           Choose an audio file
           <input
@@ -140,12 +157,17 @@ export function SettingsScreen() {
             </button>
           </p>
         ) : null}
+        {beatMessage ? (
+          <p className="help" data-testid="beat-message">
+            {beatMessage}
+          </p>
+        ) : null}
         <label className="bpm">
           Tempo {settings.customBpm} BPM
           <input
             type="range"
             min={40}
-            max={120}
+            max={160}
             value={settings.customBpm}
             onChange={(event) => {
               setCustomBpm(Number(event.target.value));
@@ -156,6 +178,9 @@ export function SettingsScreen() {
         <button type="button" className="btn btn-quiet inline" onClick={onTapTempo}>
           {tapHint}
         </button>
+        <h3>Song speed</h3>
+        <p className="help">Slow it down or speed it up. The bridge follows, and it stays calm. This choice is remembered for the song.</p>
+        <SpeedPad speed={speed} feel={feel} onChange={setSongSpeed} />
       </section>
 
       <section className="card">
