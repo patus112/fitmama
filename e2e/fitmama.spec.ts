@@ -181,6 +181,72 @@ test('ending early keeps the next day closed', async ({ page }) => {
   await expect(page.getByTestId('day-p1d2')).toHaveAttribute('data-state', 'locked');
 });
 
+async function expectHudFits(page: Page) {
+  await expect(page.getByTestId('combo')).toContainText(/Find the groove|Nice and easy|Nice rhythm!|Smooth and slow|In the flow/);
+  const boxes = await page.evaluate(() => {
+    const ids = ['combo', 'timer', 'live-score', 'pause', 'music-button'];
+    return ids.map((id) => {
+      const el = document.querySelector(`[data-testid="${id}"]`);
+      if (!el) return null;
+      const box = el.getBoundingClientRect();
+      let clipped = box.left < -1 || box.top < -1 || box.right > window.innerWidth + 1 || box.bottom > window.innerHeight + 1;
+      let parent = el.parentElement;
+      while (parent && !clipped) {
+        const style = getComputedStyle(parent);
+        const overflow = `${style.overflow}${style.overflowX}${style.overflowY}`;
+        if (/hidden|clip/.test(overflow)) {
+          const frame = parent.getBoundingClientRect();
+          clipped = box.left < frame.left - 1 || box.right > frame.right + 1 || box.top < frame.top - 1 || box.bottom > frame.bottom + 1;
+        }
+        parent = parent.parentElement;
+      }
+      const strong = el.querySelector('strong');
+      const textCut = strong ? strong.scrollWidth > strong.clientWidth + 1 || strong.scrollHeight > strong.clientHeight + 1 : false;
+      return { id, x: box.x, y: box.y, width: box.width, height: box.height, clipped, textCut };
+    });
+  });
+  const visible = boxes.filter((box): box is NonNullable<typeof box> => box !== null && box.width > 0);
+  expect(visible.map((box) => box.id)).toEqual(['combo', 'timer', 'live-score', 'pause', 'music-button']);
+  const bad = visible.filter((box) => box.clipped || box.textCut);
+  expect(bad, JSON.stringify(visible)).toEqual([]);
+  for (let index = 0; index < visible.length; index += 1) {
+    for (let other = index + 1; other < visible.length; other += 1) {
+      const a = visible[index];
+      const b = visible[other];
+      if (!a || !b) continue;
+      expect(boxesOverlap(a, b), `${a.id} overlaps ${b.id}`).toBe(false);
+    }
+  }
+}
+
+test('game HUDs fit on phone portrait and landscape', async ({ page }) => {
+  test.setTimeout(60_000);
+  const sizes = [
+    { width: 390, height: 844 },
+    { width: 375, height: 667 },
+    { width: 844, height: 390 },
+  ];
+  await openReady(page, '/fitmama/?fast=1#/practice/chin-tuck');
+  for (const size of sizes) {
+    await page.setViewportSize(size);
+    await page.goto('/fitmama/?fast=1#/practice/chin-tuck');
+    await expect(page.getByTestId('pause')).toBeVisible();
+    await expect(page.getByTestId('hold-ring')).toBeVisible();
+    await expectHudFits(page);
+
+    await page.goto('/fitmama/?fast=1#/practice/breath-46');
+    await expect(page.getByTestId('pause')).toBeVisible();
+    await expect(page.getByTestId('breath-circle')).toBeVisible();
+    await expectHudFits(page);
+
+    await page.goto('/fitmama/?fast=1#/plan');
+    await page.getByTestId('start-day').click();
+    await expect(page.getByTestId('pause')).toBeVisible();
+    await expect(page.locator('.character')).toBeVisible();
+    await expectHudFits(page);
+  }
+});
+
 test('hold and breath games follow the song', async ({ page }) => {
   test.setTimeout(20_000);
   await openReady(page, '/fitmama/?fast=1#/practice/chin-tuck');

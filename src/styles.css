@@ -381,16 +381,32 @@ img { max-width: 100%; }
 .blob { position: absolute; border-radius: 50%; pointer-events: none; z-index: 0; }
 .blob-a { width: 160px; height: 160px; left: -50px; bottom: 70px; background: rgba(143, 201, 160, 0.45); }
 .blob-b { width: 180px; height: 180px; right: -60px; top: 30px; background: rgba(255, 127, 92, 0.18); }
-.hud, .stage, .lane { position: relative; z-index: 1; }
+.hud, .stage, .lane { position: relative; z-index: 1; min-width: 0; max-width: 100%; }
 .hud {
   z-index: 5;
   display: grid;
-  grid-template-columns: auto minmax(0, 1fr) auto;
+  grid-template-columns: max-content minmax(0, 1fr) max-content;
+  grid-template-areas: "combo timer actions";
   align-items: center;
   column-gap: 8px;
+  row-gap: 8px;
+  max-width: 100%;
 }
-.timer-pill { justify-self: center; }
-.hud-right { display: flex; flex-wrap: wrap; justify-content: flex-end; align-items: center; gap: 8px; }
+.combo-pill { grid-area: combo; justify-self: start; }
+.timer-pill { grid-area: timer; justify-self: center; }
+.hud-right {
+  grid-area: actions;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 8px;
+  justify-self: end;
+  max-width: 100%;
+}
+.combo-pill strong,
+.score-pill strong,
+.timer-pill span { white-space: nowrap; }
 .game .sound { display: contents; }
 .combo-pill, .score-pill {
   display: flex;
@@ -480,7 +496,7 @@ img { max-width: 100%; }
   z-index: 2;
   box-shadow: var(--shadow);
 }
-.character { position: relative; height: min(168px, 70%); width: auto; aspect-ratio: 1197 / 390; max-width: 92%; }
+.character { position: relative; height: min(168px, 70%); width: auto; aspect-ratio: 1197 / 390; max-width: 100%; }
 .character img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; }
 .pops { position: absolute; left: 8px; bottom: 8px; z-index: 2; }
 .pop { animation: rise 1.4s ease forwards; }
@@ -709,8 +725,21 @@ img { max-width: 100%; }
   }
 }
 
+@media (max-width: 640px) {
+  .hud {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-areas:
+      "combo"
+      "actions"
+      "timer";
+  }
+  .combo-pill,
+  .hud-right,
+  .timer-pill { max-width: 100%; }
+}
+
 @media (max-width: 720px) and (orientation: portrait) {
-  .character { height: 150px; }
+  .character { width: 100%; height: auto; max-height: 150px; }
   .countdown strong { font-size: 84px; }
 }
 
