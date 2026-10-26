@@ -52,6 +52,7 @@ test('plan, library, and calm copy are on the main screens', async ({ page }) =>
   }
   await expect(page.getByTestId('day-p1d1')).toHaveAttribute('data-state', 'current');
   await expect(page.getByTestId('day-p1d2')).toHaveAttribute('data-state', 'locked');
+  await expect(page.locator('[data-testid="today-plan"] img.thumb').first()).toBeVisible();
   await expectNoAxeViolations(page);
 
   await page.goto('/fitmama/#/exercises');
@@ -64,6 +65,13 @@ test('plan, library, and calm copy are on the main screens', async ({ page }) =>
   await expect(page.getByRole('link', { name: /Chin tuck/ })).toBeVisible();
   await expect(page.getByRole('link', { name: /Glute bridge/ })).toHaveCount(0);
   await page.getByRole('button', { name: 'All' }).click();
+  await expect(page.locator('a[href="#/exercises/chin-tuck"] img.thumb')).toHaveAttribute('src', /chin-tuck/);
+  await expect(page.locator('.placeholder-art')).toHaveCount(0);
+  await expectNoAxeViolations(page);
+
+  await page.goto('/fitmama/#/exercises/chin-tuck');
+  await expect(page.getByRole('heading', { name: 'Chin tuck' })).toBeVisible();
+  await expect(page.locator('.hero-photo img')).toHaveAttribute('src', /chin-tuck/);
   await expectNoAxeViolations(page);
 
   await page.goto('/fitmama/#/exercises/glute-bridge');
@@ -252,11 +260,13 @@ test('hold and breath games follow the song', async ({ page }) => {
   await openReady(page, '/fitmama/?fast=1#/practice/chin-tuck');
   await expect(page.getByTestId('pause')).toBeVisible();
   await expect(page.getByTestId('hold-ring')).toBeVisible();
+  await expect(page.getByTestId('hold-art')).toHaveAttribute('src', /chin-tuck/);
   await expect(page.getByTestId('tempo-feel')).toHaveText(/Calm|Steady|Brisk/);
   await expect
     .poll(async () => Number((await page.getByTestId('hold-ring').getAttribute('data-progress')) ?? '0'))
     .toBeGreaterThan(0.2);
   await openReady(page, '/fitmama/?fast=1#/practice/breath-46');
+  await expect(page.getByTestId('breath-circle')).toHaveAttribute('src', /breathing-4-6/);
   await expect(page.getByTestId('pause')).toBeVisible();
   await expect(page.getByTestId('breath-circle')).toBeVisible();
   await expect(page.getByTestId('cue')).toHaveText(/Inhale|Exhale/);

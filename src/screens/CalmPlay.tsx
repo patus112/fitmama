@@ -4,8 +4,8 @@ import { GameClock } from '../audio/clock';
 import { music, unlockAudio } from '../audio/engine';
 import { SoundControl } from '../components/SoundControl';
 import { SpeedPad } from '../components/SpeedPad';
-import { PlaceholderArt } from '../components/PlaceholderArt';
 import { countdownFrom } from '../config';
+import { exercisePhotos } from '../media';
 import { formatClock, formatPoints } from '../domain/format';
 import { breathFrame, breathPattern, holdBeatsLeft, holdsCompleted, type BlockResult } from '../domain/play';
 import { MAX_COMBO, POINTS_PER_UP, comboMessage, type ScoreState } from '../domain/scoring';
@@ -279,6 +279,7 @@ export function CalmPlay({
         ? 'Hold'
         : 'Rest';
   const cueClass = exercise.mode === 'breath' ? (visual.phase === 'inhale' ? 'up' : 'down') : visual.holding ? 'up' : 'down';
+  const art = exercisePhotos[exercise.id];
 
   return (
     <div className="game" data-testid="game">
@@ -322,19 +323,30 @@ export function CalmPlay({
         </p>
         {exercise.mode === 'breath' ? (
           <div className="breath-wrap">
-            <div
-              className="breath-circle"
-              data-testid="breath-circle"
-              data-scale={visual.scale.toFixed(2)}
-              style={{ transform: `scale(${visual.scale})` }}
-            />
+            {art ? (
+              <img
+                className="breath-circle breath-art"
+                data-testid="breath-circle"
+                data-scale={visual.scale.toFixed(2)}
+                src={art}
+                alt=""
+                style={{ transform: `scale(${visual.scale})` }}
+              />
+            ) : (
+              <div
+                className="breath-circle"
+                data-testid="breath-circle"
+                data-scale={visual.scale.toFixed(2)}
+                style={{ transform: `scale(${visual.scale})` }}
+              />
+            )}
             <p className="breath-label">{exercise.name}</p>
           </div>
         ) : (
           <div className="hold-wrap">
             <div className="hold-stage">
               <HoldRing progress={visual.progress} />
-              <PlaceholderArt compact />
+              {art ? <img className="hold-art" src={art} alt="" data-testid="hold-art" /> : null}
             </div>
             <p className="hold-count" data-testid="hold-beats">
               {visual.beats > 0 ? visual.beats : '·'}

@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { illustrationPath } from './illustrations';
 import { moreExercises } from './moreExercises';
 import { ZONE_IDS, type ZoneId } from './zones';
 
@@ -400,7 +401,7 @@ function withRepWindow(exercise: ExerciseInput): Exercise {
   const maxRepSeconds = exercise.maxRepSeconds ?? 4;
   const mode = exercise.mode ?? (exercise.id === 'short-plank' ? 'hold' : 'rep');
   const zones = exercise.zones ?? ZONE_BY_ID[exercise.id] ?? ['relax'];
-  const image = exercise.image ?? PHOTO_BY_ID[exercise.id] ?? `placeholders/${exercise.id}.svg`;
+  const image = exercise.image ?? illustrationPath(exercise.id) ?? PHOTO_BY_ID[exercise.id] ?? `placeholders/${exercise.id}.svg`;
   return {
     ...exercise,
     minRepSeconds,

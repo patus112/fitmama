@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Check, Flame, Leaf, Lock, Play, Star } from 'lucide-react';
 import { music, unlockAudio } from '../audio/engine';
 import { QuietLinks } from '../components/QuietLinks';
+import { ExerciseThumb } from '../components/ExerciseFigure';
 import { exerciseById } from '../domain/catalog';
 import { formatPoints } from '../domain/format';
 import { blocksForDay, plannedDay } from '../domain/generator';
@@ -209,12 +210,16 @@ function TodayPlan({ zones, day }: { zones: readonly string[]; day: DayRef }) {
       <h2>{planned.light ? 'Light day' : 'Today'}</h2>
       <p>{daySummary(zones, day)}. One calm breath is always in there.</p>
       <ol className="today-moves">
-        {blocks.map((block, index) => (
-          <li key={`${block.exerciseId}-${index}`}>
-            <strong>{exerciseById(block.exerciseId)?.name ?? 'Move'}</strong>
-            <span>{blockLength(block.seconds)}</span>
-          </li>
-        ))}
+        {blocks.map((block, index) => {
+          const move = exerciseById(block.exerciseId);
+          return (
+            <li key={`${block.exerciseId}-${index}`}>
+              {move ? <ExerciseThumb exercise={move} /> : null}
+              <strong>{move?.name ?? 'Move'}</strong>
+              <span className="move-time">{blockLength(block.seconds)}</span>
+            </li>
+          );
+        })}
       </ol>
     </section>
   );

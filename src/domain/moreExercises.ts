@@ -29,7 +29,6 @@ export const moreExercises = [
     singleHold: true,
     holdSeconds: 180,
     stopIf: lymphStop,
-    image: 'placeholders/legs-up-the-wall.svg',
   },
   {
     id: 'ankle-pumps',
@@ -54,7 +53,6 @@ export const moreExercises = [
     cueUp: 'Flex',
     cueDown: 'Point',
     stopIf: lymphStop,
-    image: 'placeholders/ankle-pumps.svg',
   },
   {
     id: 'walk-in-place',
@@ -79,7 +77,6 @@ export const moreExercises = [
     singleHold: true,
     holdSeconds: 180,
     stopIf: 'Stop if you feel unsteady or short of breath. Slow is the point.',
-    image: 'placeholders/walk-in-place.svg',
   },
   {
     id: 'neck-lymph-stroke',
@@ -104,7 +101,6 @@ export const moreExercises = [
     cueUp: 'Stroke down',
     cueDown: 'Hand back',
     stopIf: neckStop,
-    image: 'placeholders/neck-lymph-stroke.svg',
   },
   {
     id: 'shoulder-rolls',
@@ -129,7 +125,6 @@ export const moreExercises = [
     cueUp: 'Lift',
     cueDown: 'Roll back',
     stopIf: neckStop,
-    image: 'placeholders/shoulder-rolls.svg',
   },
   {
     id: 'knee-rocks',
@@ -154,7 +149,6 @@ export const moreExercises = [
     cueUp: 'Rock',
     cueDown: 'Center',
     stopIf: 'Stop if the back complains. Keep the rock tiny.',
-    image: 'placeholders/knee-rocks.svg',
   },
   {
     id: 'roller-thighs',
@@ -179,7 +173,6 @@ export const moreExercises = [
     singleHold: true,
     holdSeconds: 180,
     stopIf: rollerStop,
-    image: 'placeholders/roller-thighs.svg',
   },
   {
     id: 'roller-glutes',
@@ -204,7 +197,6 @@ export const moreExercises = [
     singleHold: true,
     holdSeconds: 180,
     stopIf: rollerStop,
-    image: 'placeholders/roller-glutes.svg',
   },
   {
     id: 'roller-calves',
@@ -229,7 +221,6 @@ export const moreExercises = [
     singleHold: true,
     holdSeconds: 180,
     stopIf: rollerStop,
-    image: 'placeholders/roller-calves.svg',
   },
   {
     id: 'roller-upper-back',
@@ -254,7 +245,6 @@ export const moreExercises = [
     singleHold: true,
     holdSeconds: 180,
     stopIf: rollerStop,
-    image: 'placeholders/roller-upper-back.svg',
   },
   {
     id: 'breath-46',
@@ -277,7 +267,6 @@ export const moreExercises = [
     zones: ['relax'] as ZoneId[],
     mode: 'breath' as const,
     stopIf: breathStop,
-    image: 'placeholders/breath-46.svg',
   },
   {
     id: 'humming-breath',
@@ -300,7 +289,6 @@ export const moreExercises = [
     zones: ['relax'] as ZoneId[],
     mode: 'breath' as const,
     stopIf: breathStop,
-    image: 'placeholders/humming-breath.svg',
   },
   {
     id: 'pelvic-floor-release-breath',
@@ -323,7 +311,6 @@ export const moreExercises = [
     zones: ['relax', 'pelvic-floor'] as ZoneId[],
     mode: 'breath' as const,
     stopIf: breathStop,
-    image: 'placeholders/pelvic-floor-release-breath.svg',
   },
   {
     id: 'chin-tuck',
@@ -348,7 +335,6 @@ export const moreExercises = [
     holdSeconds: 3,
     stopIf: neckStop,
     honestNote: CHIN_NOTE,
-    image: 'placeholders/chin-tuck.svg',
   },
   {
     id: 'tongue-press',
@@ -373,7 +359,6 @@ export const moreExercises = [
     holdSeconds: 8,
     stopIf: neckStop,
     honestNote: CHIN_NOTE,
-    image: 'placeholders/tongue-press.svg',
   },
   {
     id: 'jaw-jut',
@@ -398,7 +383,6 @@ export const moreExercises = [
     holdSeconds: 5,
     stopIf: neckStop,
     honestNote: CHIN_NOTE,
-    image: 'placeholders/jaw-jut.svg',
   },
   {
     id: 'vowel-faces',
@@ -424,7 +408,6 @@ export const moreExercises = [
     cueDown: 'Soften',
     stopIf: neckStop,
     honestNote: CHIN_NOTE,
-    image: 'placeholders/vowel-faces.svg',
   },
   {
     id: 'neck-tilt',
@@ -449,6 +432,5 @@ export const moreExercises = [
     holdSeconds: 20,
     stopIf: neckStop,
     honestNote: CHIN_NOTE,
-    image: 'placeholders/neck-tilt.svg',
   },
 ];

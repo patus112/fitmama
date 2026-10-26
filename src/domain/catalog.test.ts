@@ -1,5 +1,9 @@
+import { existsSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
-import { GLUTE_BRIDGE_ID, exercises } from './catalog';
+import { GLUTE_BRIDGE_ID, exercises, exercisesNeedingArt } from './catalog';
+import { ILLUSTRATION_FILE_BY_ID } from './illustrations';
+import { exercisePhotos } from '../media';
 
 describe('exercise catalog', () => {
   it('includes the owner set plus the three lying-down extras', () => {
@@ -62,7 +66,8 @@ describe('exercise catalog', () => {
     ]);
     const chin = exercises.find((exercise) => exercise.id === 'chin-tuck');
     expect(chin?.honestNote?.toLowerCase()).toContain('weight loss');
-    expect(chin?.image.startsWith('placeholders/')).toBe(true);
+    expect(chin?.image).toBe('illustrations/chin-tuck.webp');
+    expect(exercisesNeedingArt()).toEqual([]);
     expect(exercises.every((exercise) => exercise.stopIf.length > 0)).toBe(true);
   });
 
@@ -76,5 +81,15 @@ describe('exercise catalog', () => {
     const squat = exercises.find((exercise) => exercise.id === 'squat-dumbbell');
     expect(squat?.steps.join(' ').toLowerCase()).toContain('deep bend');
     expect(squat?.summary.toLowerCase()).toContain('not a deep bend');
+  });
+
+  it('uses a real illustration for every move that was waiting on art', () => {
+    expect(Object.keys(ILLUSTRATION_FILE_BY_ID)).toHaveLength(21);
+    for (const [id, file] of Object.entries(ILLUSTRATION_FILE_BY_ID)) {
+      const exercise = exercises.find((item) => item.id === id);
+      expect(exercise?.image).toBe(`illustrations/${file}`);
+      expect(existsSync(fileURLToPath(new URL(`../assets/illustrations/${file}`, import.meta.url)))).toBe(true);
+      expect(exercisePhotos[id]).toEqual(expect.any(String));
+    }
   });
 });
