@@ -1,3 +1,4 @@
+import { clampSpeed } from '../domain/tempo';
 import type { TrackId } from '../domain/tracks';
 import {
   SILENT_WAV,
@@ -25,6 +26,7 @@ export interface MusicStart {
   volume: number;
   muted: boolean;
   bpm: number;
+  rate?: number;
   trackId: TrackId | string;
   customUrl?: string | null;
   getTime: () => number;
@@ -118,7 +120,10 @@ export class MusicEngine {
   private running = false;
   private volume = 0.35;
   private muted = false;
-  private bpm = 96;
+  private songBpm = 96;
+  private rate = 1;
+  private segmentReal = 0;
+  private segmentSong = 0;
   private trackId = 'sunday-stretch';
   private custom: HTMLAudioElement | null = null;
   private fileAudible = false;
@@ -140,9 +145,12 @@ export class MusicEngine {
     this.stopNodes();
     this.volume = options.volume;
     this.muted = options.muted;
-    this.bpm = options.bpm;
+    this.songBpm = options.bpm > 0 ? options.bpm : 96;
+    this.rate = clampSpeed(options.rate ?? 1);
     this.trackId = options.trackId;
     this.getTime = options.getTime;
+    this.segmentReal = this.getTime();
+    this.segmentSong = 0;
     if (options.trackId === 'custom' && options.customUrl) {
       return this.startFile(options.customUrl);
     }
@@ -213,6 +221,18 @@ export class MusicEngine {
     }
   }
 
+  /** Speed up or slow down without moving the playhead. Pitch stays put for files. */
+  setRate(rate: number): void {
+    const now = this.getTime();
+    const song = this.segmentSong + (now - this.segmentReal) * this.rate;
+    this.rate = clampSpeed(rate);
+    this.segmentReal = now;
+    this.segmentSong = song;
+    this.applyRate();
+    const beat = 60 / this.songBpm;
+    this.beatIndex = Math.floor(song / beat) + 1;
+  }
+
   pause(): void {
     this.running = false;
     this.fileAudible = false;
@@ -280,7 +300,7 @@ export class MusicEngine {
     osc.start();
     this.drone = osc;
     this.running = true;
-    this.beatIndex = Math.floor(this.getTime() / (60 / this.bpm));
+    this.beatIndex = Math.floor(this.songNow() / (60 / this.songBpm));
     this.pump();
     trace('synth');
   }
@@ -303,19 +323,35 @@ export class MusicEngine {
     this.custom.setAttribute('webkit-playsinline', 'true');
     if (this.custom.src !== url) this.custom.src = url;
     this.custom.volume = this.elementVolume();
+    this.applyRate(this.custom);
     return this.custom;
+  }
+
+  private songNow(): number {
+    return this.segmentSong + (this.getTime() - this.segmentReal) * this.rate;
+  }
+
+  private applyRate(element: HTMLAudioElement | null = this.custom): void {
+    if (!element) return;
+    const rate = clampSpeed(this.rate);
+    element.playbackRate = rate;
+    element.preservesPitch = true;
+    const vendor = element as HTMLAudioElement & { webkitPreservesPitch?: boolean; mozPreservesPitch?: boolean };
+    vendor.webkitPreservesPitch = true;
+    vendor.mozPreservesPitch = true;
   }
 
   private pump = (): void => {
     if (!this.running || !shared || !this.master) return;
     const timbre = TIMBRES[this.trackId] ?? TIMBRES['sunday-stretch'];
     if (!timbre) return;
-    const beat = 60 / this.bpm;
-    const now = this.getTime();
-    const horizon = now + 0.4;
+    const beat = 60 / this.songBpm;
+    const nowSong = this.songNow();
+    const horizon = nowSong + 0.4 * this.rate;
     while (this.beatIndex * beat < horizon) {
-      const when = this.beatIndex * beat;
-      const delay = Math.max(0, when - now);
+      const songWhen = this.beatIndex * beat;
+      const realWhen = this.segmentReal + (songWhen - this.segmentSong) / this.rate;
+      const delay = Math.max(0, realWhen - this.getTime());
       this.blip(shared.currentTime + delay, this.beatIndex, timbre);
       this.beatIndex += 1;
     }

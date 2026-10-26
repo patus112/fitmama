@@ -1,8 +1,9 @@
 import Dexie, { type Table } from 'dexie';
 import {
   DEFAULT_SETTINGS,
+  normalizeSettings,
   sessionSchema,
-  settingsSchema,
+  settingsForStorage,
   type SavedSession,
   type SessionInput,
   type Settings,
@@ -20,6 +21,9 @@ export interface AudioRow {
   id: 'custom';
   name: string;
   blob: Blob;
+  detectedBpm?: number;
+  beatOffset?: number;
+  speed?: number;
 }
 
 interface FavoriteRow {
@@ -68,17 +72,20 @@ export async function addSession(input: SessionInput): Promise<number> {
 export async function loadSettings(): Promise<Settings> {
   const row = await db.settings.get('app');
   if (!row) return DEFAULT_SETTINGS;
-  const parsed = settingsSchema.safeParse({
-    volume: row.volume,
-    muted: row.muted,
-    trackId: row.trackId,
-    customBpm: row.customBpm,
-  });
-  return parsed.success ? parsed.data : DEFAULT_SETTINGS;
+  return (
+    normalizeSettings({
+      volume: row.volume,
+      muted: row.muted,
+      trackId: row.trackId,
+      customBpm: row.customBpm,
+      bpmManual: row.bpmManual,
+      speeds: row.speeds,
+    }) ?? DEFAULT_SETTINGS
+  );
 }
 
 export async function saveSettings(settings: Settings): Promise<void> {
-  await db.settings.put({ ...settingsSchema.parse(settings), id: 'app' });
+  await db.settings.put({ ...settingsForStorage(settings), id: 'app' });
 }
 
 export async function loadCustomAudio(): Promise<AudioRow | undefined> {
@@ -87,6 +94,18 @@ export async function loadCustomAudio(): Promise<AudioRow | undefined> {
 
 export async function saveCustomAudio(file: Blob, name: string): Promise<void> {
   await db.audio.put({ id: 'custom', name, blob: file });
+}
+
+export async function saveDetectedTempo(bpm: number, offset: number): Promise<void> {
+  const existing = await db.audio.get('custom');
+  if (!existing) return;
+  await db.audio.put({ ...existing, detectedBpm: bpm, beatOffset: offset });
+}
+
+export async function saveCustomSpeed(speed: number): Promise<void> {
+  const existing = await db.audio.get('custom');
+  if (!existing) return;
+  await db.audio.put({ ...existing, speed });
 }
 
 export async function clearCustomAudio(): Promise<void> {

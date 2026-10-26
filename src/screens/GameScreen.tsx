@@ -1,18 +1,30 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { ArrowDown, ArrowUp, Pause, Play, Star } from 'lucide-react';
 import { format } from 'date-fns';
 import { GameClock } from '../audio/clock';
 import { music, unlockAudio } from '../audio/engine';
 import { Character } from '../components/Character';
 import { SoundControl } from '../components/SoundControl';
+import { SpeedPad } from '../components/SpeedPad';
 import { countdownFrom, gameSeconds } from '../config';
-import { GLUTE_BRIDGE_ID } from '../domain/catalog';
-import { TRAVEL_SECONDS, buildChart, noteTravel, remainingUpMoves, type Note } from '../domain/chart';
+import { exerciseById, GLUTE_BRIDGE_ID } from '../domain/catalog';
+import { TRAVEL_SECONDS, noteTravel, remainingUpMoves } from '../domain/chart';
 import { formatClock, formatPoints } from '../domain/format';
 import { canPlayDay, dayKey, dayTitle, isValidDay } from '../domain/plan';
 import { activeDirection, poseAt } from '../domain/pose';
 import { advanceScore, comboMessage, initialScore, type ScoreState } from '../domain/scoring';
-import { resolveBpm } from '../domain/tracks';
+import {
+  SPEED_MAX,
+  buildBeatChart,
+  planRep,
+  projectNotes,
+  pushRate,
+  replaceFutureNotes,
+  songTimeAt,
+  type BeatNote,
+  type TempoAnchor,
+} from '../domain/tempo';
+import { resolveBeatOffset, resolveSongBpm, songName } from '../domain/tracks';
 import { addSession } from '../data/db';
 import { useReducedMotion } from '../hooks/useReducedMotion';
 import { useAppState } from '../state/AppState';
@@ -25,10 +37,15 @@ interface Pop {
 }
 
 export function GameScreen({ phaseIndex, day }: { phaseIndex: number; day: number }) {
-  const { settings, sessions, customUrl, refreshSessions } = useAppState();
+  const { settings, sessions, customUrl, customName, detectedBpm, beatOffset, refreshSessions, setSongSpeed } =
+    useAppState();
   const reduce = useReducedMotion();
   const ref = { phaseIndex, day };
   const allowed = isValidDay(ref) && canPlayDay(ref, sessions);
+  const bridge = exerciseById(GLUTE_BRIDGE_ID);
+  const songBpm = resolveSongBpm(settings.trackId, settings.customBpm, detectedBpm, settings.bpmManual);
+  const speed = settings.speeds[settings.trackId] ?? 1;
+  const offset = resolveBeatOffset(settings.trackId, settings.bpmManual, beatOffset);
 
   if (!isValidDay(ref)) {
     return (
@@ -57,12 +74,18 @@ export function GameScreen({ phaseIndex, day }: { phaseIndex: number; day: numbe
     <LiveGame
       phaseIndex={phaseIndex}
       day={day}
-      bpm={resolveBpm(settings.trackId, settings.customBpm)}
+      songBpm={songBpm}
+      speed={speed}
+      beatOffset={offset}
+      minRep={bridge?.minRepSeconds ?? 2}
+      maxRep={bridge?.maxRepSeconds ?? 4}
+      songTitle={songName(settings.trackId, customName)}
       trackId={settings.trackId}
       volume={settings.volume}
       muted={settings.muted}
       reduce={reduce}
       customUrl={customUrl}
+      onSpeed={setSongSpeed}
       refreshSessions={refreshSessions}
     />
   );
@@ -71,27 +94,51 @@ export function GameScreen({ phaseIndex, day }: { phaseIndex: number; day: numbe
 function LiveGame({
   phaseIndex,
   day,
-  bpm,
+  songBpm,
+  speed,
+  beatOffset,
+  minRep,
+  maxRep,
+  songTitle,
   trackId,
   volume,
   muted,
   reduce,
   customUrl,
+  onSpeed,
   refreshSessions,
 }: {
   phaseIndex: number;
   day: number;
-  bpm: number;
+  songBpm: number;
+  speed: number;
+  beatOffset: number;
+  minRep: number;
+  maxRep: number;
+  songTitle: string;
   trackId: string;
   volume: number;
   muted: boolean;
   reduce: boolean;
   customUrl: string | null;
+  onSpeed: (speed: number) => void;
   refreshSessions: () => Promise<void>;
 }) {
   const duration = gameSeconds();
-  const notes = useMemo(() => buildChart(bpm, duration), [bpm, duration]);
-  const travel = Math.min(TRAVEL_SECONDS, notes[0]?.time ?? TRAVEL_SECONDS);
+  const plan = planRep(songBpm, speed, { minSeconds: minRep, maxSeconds: maxRep });
+  const songDuration = duration * SPEED_MAX + 8;
+  const [fileDuration, setFileDuration] = useState<number | null>(null);
+  const [chart, setChart] = useState<BeatNote[]>(() =>
+    buildBeatChart({
+      songBpm,
+      beatOffset,
+      beatsPerRep: plan.beatsPerRep,
+      songDuration,
+      leadSongTime: TRAVEL_SECONDS * speed,
+      fileDuration: null,
+    }),
+  );
+  const [anchors, setAnchors] = useState<TempoAnchor[]>([{ realTime: 0, songTime: 0, rate: speed }]);
   const [mode, setMode] = useState<Mode>('countdown');
   const [count, setCount] = useState(() => countdownFrom());
   const [hud, setHud] = useState({ now: 0, score: 0, combo: 1, maxCombo: 0 });
@@ -102,14 +149,20 @@ function LiveGame({
   const scoreRef = useRef<ScoreState>(initialScore());
   const nowRef = useRef(0);
   const clockRef = useRef<GameClock | null>(null);
-  const notesRef = useRef<Note[]>(notes);
+  const chartRef = useRef<BeatNote[]>(chart);
+  const anchorsRef = useRef<TempoAnchor[]>(anchors);
+  const speedRef = useRef(speed);
+  const songRef = useRef({ songBpm, beatOffset, beatsPerRep: plan.beatsPerRep, fileDuration });
+  const chartKeyRef = useRef('');
   const customRef = useRef(customUrl);
   const started = useRef(false);
   const finishing = useRef(false);
   const popSerial = useRef(1);
   const countRef = useRef(count);
   const audioRef = useRef({ volume, muted, trackId });
-  notesRef.current = notes;
+  chartRef.current = chart;
+  anchorsRef.current = anchors;
+  songRef.current = { songBpm, beatOffset, beatsPerRep: plan.beatsPerRep, fileDuration };
   customRef.current = customUrl;
   audioRef.current = { volume, muted, trackId };
 
@@ -142,6 +195,66 @@ function LiveGame({
   };
 
   useEffect(() => {
+    if (trackId !== 'custom' || !customUrl) {
+      setFileDuration(null);
+      return;
+    }
+    const element = document.createElement('audio');
+    element.preload = 'metadata';
+    element.src = customUrl;
+    const onMeta = () => {
+      if (Number.isFinite(element.duration) && element.duration > 0.5) setFileDuration(element.duration);
+    };
+    element.addEventListener('loadedmetadata', onMeta);
+    return () => {
+      element.removeEventListener('loadedmetadata', onMeta);
+      element.src = '';
+    };
+  }, [customUrl, trackId]);
+
+  useEffect(() => {
+    const previous = speedRef.current;
+    speedRef.current = speed;
+    if (!started.current) {
+      const next = [{ realTime: 0, songTime: 0, rate: speed }];
+      anchorsRef.current = next;
+      setAnchors(next);
+      return;
+    }
+    if (previous === speed) return;
+    const now = clockRef.current?.now() ?? nowRef.current;
+    const next = pushRate(anchorsRef.current, now, speed);
+    anchorsRef.current = next;
+    setAnchors(next);
+    music.setRate(speed);
+  }, [speed]);
+
+  useEffect(() => {
+    const key = `${songBpm}|${beatOffset}|${plan.beatsPerRep}|${fileDuration ?? ''}`;
+    const built = buildBeatChart({
+      songBpm,
+      beatOffset,
+      beatsPerRep: plan.beatsPerRep,
+      songDuration,
+      leadSongTime: started.current ? 0 : TRAVEL_SECONDS * speed,
+      fileDuration,
+    });
+    if (!started.current) {
+      chartKeyRef.current = key;
+      chartRef.current = built;
+      setChart(built);
+      return;
+    }
+    if (chartKeyRef.current === key) return;
+    chartKeyRef.current = key;
+    const now = clockRef.current?.now() ?? nowRef.current;
+    const songNow = songTimeAt(anchorsRef.current, now);
+    const merged = replaceFutureNotes(chartRef.current, built, songNow, TRAVEL_SECONDS * speed);
+    chartRef.current = merged;
+    setChart(merged);
+  }, [songBpm, beatOffset, plan.beatsPerRep, speed, fileDuration, songDuration]);
+
+  useEffect(() => {
     if (mode !== 'countdown') return;
     const timer = window.setInterval(() => {
       const next = countRef.current - 1;
@@ -165,11 +278,18 @@ function LiveGame({
     if (!started.current) {
       started.current = true;
       clock.start();
+      const now = clock.now();
+      const rate = speedRef.current;
+      const nextAnchors = [{ realTime: now, songTime: 0, rate }];
+      anchorsRef.current = nextAnchors;
+      setAnchors(nextAnchors);
       const audio = audioRef.current;
+      const song = songRef.current;
       const startedAudio = {
         volume: audio.volume,
         muted: audio.muted,
-        bpm,
+        bpm: song.songBpm,
+        rate,
         trackId: audio.trackId,
         customUrl: customRef.current,
         getTime: () => clock.now(),
@@ -177,7 +297,7 @@ function LiveGame({
       void music.start(startedAudio).catch(() => {
         if (startedAudio.trackId !== 'custom') return;
         void music
-          .start({ ...startedAudio, trackId: 'sunday-stretch', customUrl: null })
+          .start({ ...startedAudio, trackId: 'sunday-stretch', customUrl: null, bpm: 96 })
           .catch(() => {
             /* The chart keeps time even if the speaker stays quiet. */
           });
@@ -191,7 +311,12 @@ function LiveGame({
     const loop = () => {
       const current = clock.now();
       const previous = nowRef.current;
-      const advanced = advanceScore(scoreRef.current, notesRef.current, previous, current);
+      const advanced = advanceScore(
+        scoreRef.current,
+        projectNotes(chartRef.current, anchorsRef.current),
+        previous,
+        current,
+      );
       scoreRef.current = advanced.state;
       nowRef.current = current;
       if (advanced.gained.length > 0) {
@@ -217,7 +342,7 @@ function LiveGame({
     };
     frame = requestAnimationFrame(loop);
     return () => cancelAnimationFrame(frame);
-  }, [bpm, duration, mode]);
+  }, [duration, mode]);
 
   useEffect(() => {
     music.apply(volume, muted);
@@ -229,6 +354,11 @@ function LiveGame({
     };
   }, []);
 
+  function movesAhead(): number {
+    const now = clockRef.current?.now() ?? nowRef.current;
+    return remainingUpMoves(projectNotes(chartRef.current, anchorsRef.current), now);
+  }
+
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
       if (event.key === 'Escape' && (mode === 'play' || mode === 'paused')) {
@@ -237,7 +367,7 @@ function LiveGame({
           clockRef.current?.pause();
           music.pause();
         }
-        setMovesLeft(remainingUpMoves(notesRef.current, clockRef.current?.now() ?? nowRef.current));
+        setMovesLeft(movesAhead());
         setMode('confirm');
       }
       if (event.key === ' ' && mode === 'play') {
@@ -270,12 +400,14 @@ function LiveGame({
       clockRef.current?.pause();
       music.pause();
     }
-    setMovesLeft(remainingUpMoves(notesRef.current, clockRef.current?.now() ?? nowRef.current));
+    setMovesLeft(movesAhead());
     setMode('confirm');
   }
 
-  const cue = activeDirection(notes, hud.now);
-  const pose = poseAt(notes, hud.now, reduce ? 0 : 0.35);
+  const live = projectNotes(chart, anchors);
+  const travel = TRAVEL_SECONDS;
+  const cue = activeDirection(live, hud.now);
+  const pose = poseAt(live, hud.now, reduce ? 0 : 0.35);
   const remaining = Math.max(0, duration - hud.now);
   const title = dayTitle({ phaseIndex, day });
 
@@ -296,7 +428,7 @@ function LiveGame({
           <span>{formatClock(remaining)}</span>
         </div>
         <div className="hud-right">
-          <SoundControl />
+          <SoundControl caption={`${songTitle} · ${plan.feel}`} />
           {mode === 'play' ? (
             <button type="button" className="icon-btn pause-btn" aria-label="Pause" data-testid="pause" onClick={pause}>
               <Pause size={18} aria-hidden="true" />
@@ -317,6 +449,9 @@ function LiveGame({
           {cue === 'up' ? <ArrowUp size={14} aria-hidden="true" /> : <ArrowDown size={14} aria-hidden="true" />}
           {cue === 'up' ? 'Hips up' : 'Hips down'}
         </p>
+        <p className="tempo-feel" data-testid="tempo-feel">
+          {plan.feel}
+        </p>
         <Character pose={pose} />
         <div className="pops">
           {pops.map((pop) => (
@@ -331,7 +466,7 @@ function LiveGame({
       <div className="lane" data-testid="note-lane">
         <div className={flash && !reduce ? 'hit-ring flash' : 'hit-ring'} data-testid="hit-ring" />
         <div className="lane-notes">
-          {notes.map((note) => {
+          {live.map((note) => {
             const offset = noteTravel(note.time, hud.now, travel);
             if (offset < -0.22 || offset > 1.05) return null;
             return (
@@ -360,6 +495,7 @@ function LiveGame({
           <div className="countdown">
             <p>Get ready</p>
             <strong aria-live="polite">{count}</strong>
+            <SpeedPad speed={speed} feel={plan.feel} onChange={onSpeed} />
           </div>
         </div>
       ) : null}
@@ -371,6 +507,7 @@ function LiveGame({
             <p>{saveError ?? 'Take a breath. The beat will wait.'}</p>
             {mode === 'paused' ? (
               <>
+                <SpeedPad speed={speed} feel={plan.feel} onChange={onSpeed} />
                 <button type="button" className="btn btn-coral" onClick={resume}>
                   <Play size={18} fill="#3B2A24" aria-hidden="true" /> Resume
                 </button>

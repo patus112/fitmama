@@ -70,6 +70,8 @@ test('plan, library, and calm copy are on the main screens', async ({ page }) =>
   expect(accept).toContain('audio/mp4');
   expect(accept).toContain('video/mp4');
   await expect(page.getByRole('button', { name: 'Test sound' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Reset song speed' })).toBeVisible();
+  await expect(page.getByTestId('speed-pad')).toBeVisible();
   await expectNoAxeViolations(page);
 });
 
@@ -112,6 +114,7 @@ test('finishing a day saves the result and unlocks the next day', async ({ page 
   await page.getByTestId('start-day').click();
   await page.setViewportSize({ width: 844, height: 390 });
   await expect(page.getByTestId('pause')).toBeVisible();
+  await expect(page.getByTestId('tempo-feel')).toHaveText(/Calm|Steady|Brisk/);
   await page.getByTestId('music-button').click();
   const popover = page.getByTestId('volume-popover');
   await expect(popover).toBeVisible();
@@ -142,6 +145,8 @@ test('ending early keeps the next day closed', async ({ page }) => {
   await page.goto('/fitmama/?fast=1#/plan');
   await page.getByTestId('start-day').click();
   await page.getByRole('button', { name: 'Pause' }).click();
+  await expect(page.getByTestId('speed-pad')).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Reset song speed' })).toBeVisible();
   await page.getByRole('button', { name: 'End session' }).click();
   await expect(page.getByRole('heading', { name: /Hang in there, only \d+ moves? left/ })).toBeVisible();
   await page.getByRole('button', { name: 'End anyway' }).click();
@@ -214,6 +219,8 @@ test('capture the game with the cue clear @screenshots', async ({ page }) => {
   await page.setViewportSize({ width: 844, height: 390 });
   await page.goto('/fitmama/#/plan');
   await page.getByTestId('start-day').click();
+  await expect(page.getByTestId('speed-pad')).toBeVisible();
+  await page.screenshot({ path: `${out}/screenshot_game_countdown.png` });
   await page.setViewportSize({ width: 844, height: 390 });
   await expect(page.getByTestId('pause')).toBeVisible({ timeout: 12_000 });
   await expect(page.getByTestId('volume-popover')).toHaveCount(0);
@@ -230,5 +237,9 @@ test('capture the game with the cue clear @screenshots', async ({ page }) => {
     )
     .toBeLessThan(168);
   await page.screenshot({ path: `${out}/screenshot_game_cue.png` });
+  await page.getByTestId('pause').click();
+  await expect(page.getByRole('heading', { name: 'Paused' })).toBeVisible();
+  await expect(page.getByTestId('speed-pad')).toBeVisible();
+  await page.screenshot({ path: `${out}/screenshot_game_paused.png` });
 });
 });

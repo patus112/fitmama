@@ -414,6 +414,20 @@ img { max-width: 100%; }
   z-index: 2;
 }
 .cue.down { background: var(--sage); color: var(--ink); }
+.tempo-feel {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  margin: 0;
+  background: white;
+  color: var(--green-deep);
+  font-weight: 800;
+  font-size: 13px;
+  border-radius: 999px;
+  padding: 4px 10px;
+  z-index: 2;
+  box-shadow: var(--shadow);
+}
 .character { position: relative; height: min(168px, 70%); width: auto; aspect-ratio: 1197 / 390; max-width: 92%; }
 .character img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; }
 .pops { position: absolute; left: 8px; bottom: 8px; z-index: 2; }
@@ -504,6 +518,7 @@ img { max-width: 100%; }
   place-items: center;
   background: rgba(255, 248, 241, 0.78);
   padding: 16px;
+  overflow: auto;
 }
 .countdown { text-align: center; }
 .countdown p { margin: 0; font-weight: 800; color: var(--muted); font-size: 22px; }
@@ -593,6 +608,32 @@ img { max-width: 100%; }
 .file-name button, .bpm { font-weight: 800; }
 .file-name button { border: 0; background: transparent; color: var(--coral-deep); cursor: pointer; }
 .bpm { display: grid; gap: 6px; margin: 12px 0; }
+.speed-pad {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  margin: 8px 0 4px;
+}
+.speed-pad p { margin: 0; min-width: 72px; text-align: center; }
+.speed-pad strong, .speed-pad span { display: block; }
+.speed-pad strong { font-size: 16px; }
+.speed-pad span { color: var(--muted); font-weight: 800; font-size: 13px; }
+.speed-pad button {
+  min-width: 44px;
+  min-height: 44px;
+  border: 0;
+  border-radius: 14px;
+  background: white;
+  color: var(--ink);
+  font-weight: 800;
+  font-size: 20px;
+  cursor: pointer;
+  box-shadow: var(--shadow);
+}
+.speed-pad button:disabled { opacity: 0.4; cursor: default; }
+.dialog .speed-pad { margin-bottom: 12px; }
 .export-row { display: grid; gap: 4px; }
 
 @keyframes rise {
@@ -619,4 +660,11 @@ img { max-width: 100%; }
 @media (max-width: 720px) and (orientation: portrait) {
   .character { height: 150px; }
   .countdown strong { font-size: 84px; }
+}
+
+@media (max-height: 420px) {
+  .countdown strong { font-size: 64px; }
+  .dialog { padding: 14px; }
+  .dialog h2 { font-size: 22px; }
+  .tempo-feel { top: 6px; }
 }
