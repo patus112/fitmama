@@ -66,7 +66,7 @@ describe('exercise catalog', () => {
     ]);
     const chin = exercises.find((exercise) => exercise.id === 'chin-tuck');
     expect(chin?.honestNote?.toLowerCase()).toContain('weight loss');
-    expect(chin?.image).toBe('illustrations/chin-tuck.webp');
+    expect(chin?.image).toBe('illustrations/chin-tuck-a.webp');
     expect(exercisesNeedingArt()).toEqual([]);
     expect(exercises.every((exercise) => exercise.stopIf.length > 0)).toBe(true);
   });
@@ -89,6 +89,7 @@ describe('exercise catalog', () => {
       const exercise = exercises.find((item) => item.id === id);
       expect(exercise?.image).toBe(`illustrations/${file}`);
       expect(existsSync(fileURLToPath(new URL(`../assets/illustrations/${file}`, import.meta.url)))).toBe(true);
+      expect(existsSync(fileURLToPath(new URL(`../assets/illustrations/${file.replace(/-a\.webp$/, '-b.webp')}`, import.meta.url)))).toBe(true);
       expect(exercisePhotos[id]).toEqual(expect.any(String));
     }
   });

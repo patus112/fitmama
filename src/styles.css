@@ -240,8 +240,6 @@ img { max-width: 100%; }
   z-index: 1;
   width: 68%;
   height: 68%;
-  object-fit: contain;
-  pointer-events: none;
 }
 .hold-count { margin: 0; font-size: 32px; line-height: 1; font-weight: 800; color: var(--ink); }
 .breath-circle {
@@ -251,11 +249,13 @@ img { max-width: 100%; }
   background: radial-gradient(circle at 40% 35%, #fff, #cde8d0 55%, #8fc9a0);
   box-shadow: 0 12px 30px rgba(47, 107, 69, 0.16);
 }
-img.breath-circle.breath-art {
-  object-fit: contain;
-  border-radius: 28px;
+.breath-circle.breath-figure {
+  width: min(220px, 62vw);
+  height: min(220px, 42vh);
+  border-radius: 0;
   background: transparent;
   box-shadow: none;
+  display: grid;
 }
 .breath-label, .calm-foot { margin: 8px 0 0; text-align: center; font-weight: 800; color: var(--green-deep); }
 .calm-foot { margin: 0; align-self: center; }
@@ -302,10 +302,42 @@ img.breath-circle.breath-art {
   width: 64px;
   height: 64px;
   border-radius: 18px;
-  object-fit: cover;
+  object-fit: contain;
   background: var(--pale);
+  position: relative;
+  overflow: hidden;
+  display: block;
 }
-.thumb.fit-contain { object-fit: contain; padding: 4px; }
+.frame-stack { position: relative; display: block; width: 100%; height: 100%; }
+.frame-stack .frame-a,
+.frame-stack .frame-b {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  display: block;
+}
+.frame-stack .frame-b {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  pointer-events: none;
+}
+.frame-stack.frame-idle.is-shown .frame-b {
+  animation: frame-crossfade calc(var(--frame-half, 3.6s) * 2) ease-in-out infinite alternate;
+}
+.frame-stack.frame-subtle.frame-idle.is-shown .frame-b { animation-name: frame-crossfade-soft; }
+@keyframes frame-crossfade {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@keyframes frame-crossfade-soft {
+  from { opacity: 0; }
+  to { opacity: 0.55; }
+}
+html[data-page-hidden] .frame-b { animation-play-state: paused; }
+@media (prefers-reduced-motion: reduce) {
+  .frame-b { display: none; animation: none; }
+}
 .game-pill {
   background: var(--pale);
   color: var(--green-deep);
@@ -322,13 +354,8 @@ img.breath-circle.breath-art {
 .detail-title { text-align: center; font-size: 18px; margin: 0; }
 .hero-wrap { position: relative; margin-bottom: 16px; }
 .hero { height: 210px; border-radius: 28px; overflow: hidden; background: linear-gradient(#fff, #f4fbf6); position: relative; }
-.hero-photo img { width: 100%; height: 210px; object-fit: cover; display: block; }
-.hero-photo img.fit-contain,
-.detail .hero-photo img.fit-contain {
-  object-fit: contain;
-  padding: 10px;
-  background: linear-gradient(#fff, #f4fbf6);
-}
+.hero-photo .frame-stack { height: 100%; }
+.hero-photo img { width: 100%; height: 100%; object-fit: contain; display: block; }
 .mat { width: 68%; height: 28px; border-radius: 16px; background: var(--sage); }
 .time-badge, .hero-tags span {
   background: white;
@@ -509,7 +536,7 @@ img.breath-circle.breath-art {
   box-shadow: var(--shadow);
 }
 .character { position: relative; height: min(168px, 70%); width: auto; aspect-ratio: 1197 / 390; max-width: 100%; }
-.stage-art { width: min(220px, 62vw); max-height: min(220px, 32vh); object-fit: contain; }
+.stage-art { width: min(220px, 62vw); height: min(220px, 32vh); }
 .character img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; }
 .pops { position: absolute; left: 8px; bottom: 8px; z-index: 2; }
 .pop { animation: rise 1.4s ease forwards; }

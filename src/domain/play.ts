@@ -32,6 +32,8 @@ export function breathPattern(songBpm: number, speed: number): BreathPattern {
 export interface BreathFrame {
   phase: 'inhale' | 'exhale';
   count: number;
+  /** 0 at the start of this phase, 1 at the end. */
+  local: number;
   scale: number;
   cyclesDone: number;
 }
@@ -49,6 +51,7 @@ export function breathFrame(songSeconds: number, pattern: BreathPattern): Breath
   return {
     phase: inhaling ? 'inhale' : 'exhale',
     count: Math.min(span, Math.max(1, count)),
+    local,
     scale,
     cyclesDone: Math.floor(beatIndex / cycleBeats),
   };
