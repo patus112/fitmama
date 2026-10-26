@@ -52,7 +52,7 @@ test('plan, library, and calm copy are on the main screens', async ({ page }) =>
   }
   await expect(page.getByTestId('day-p1d1')).toHaveAttribute('data-state', 'current');
   await expect(page.getByTestId('day-p1d2')).toHaveAttribute('data-state', 'locked');
-  await expect(page.locator('[data-testid="today-plan"] img.thumb').first()).toBeVisible();
+  await expect(page.locator('[data-testid="today-plan"] .frame-a').first()).toBeVisible();
   await expectNoAxeViolations(page);
 
   await page.goto('/fitmama/#/exercises');
@@ -60,25 +60,27 @@ test('plan, library, and calm copy are on the main screens', async ({ page }) =>
   await expect(page.getByText(DISCLAIMER)).toBeVisible();
   await expect(page.getByRole('link', { name: /Glute bridge/ })).toBeVisible();
   await expect(page.getByRole('link', { name: /Heel slides/ })).toBeVisible();
-  await expect(page.locator('a[href="#/exercises/heel-slides"] img.thumb')).toHaveAttribute('src', /heel-slides/);
-  await expect(page.locator('a[href="#/exercises/glute-bridge"] img.thumb')).toHaveAttribute('src', /glute-bridge/);
+  await expect(page.locator('a[href="#/exercises/heel-slides"] .frame-a')).toHaveAttribute('src', /heel-slides-a/);
+  await expect(page.locator('a[href="#/exercises/heel-slides"] .frame-b')).toHaveCount(1);
+  await expect(page.locator('a[href="#/exercises/glute-bridge"] .frame-a')).toHaveAttribute('src', /glute-bridge-a/);
   await expect(page.getByRole('link', { name: /Leg circles/ })).toBeVisible();
   await page.getByRole('button', { name: 'Neck & chin' }).click();
   await expect(page.getByRole('link', { name: /Chin tuck/ })).toBeVisible();
   await expect(page.getByRole('link', { name: /Glute bridge/ })).toHaveCount(0);
   await page.getByRole('button', { name: 'All' }).click();
-  await expect(page.locator('a[href="#/exercises/chin-tuck"] img.thumb')).toHaveAttribute('src', /chin-tuck/);
+  await expect(page.locator('a[href="#/exercises/chin-tuck"] .frame-a')).toHaveAttribute('src', /chin-tuck-a/);
   await expect(page.locator('.placeholder-art')).toHaveCount(0);
   await expectNoAxeViolations(page);
 
   await page.goto('/fitmama/#/exercises/chin-tuck');
   await expect(page.getByRole('heading', { name: 'Chin tuck' })).toBeVisible();
-  await expect(page.locator('.hero-photo img')).toHaveAttribute('src', /chin-tuck/);
+  await expect(page.locator('.hero-photo .frame-a')).toHaveAttribute('src', /chin-tuck-a/);
+  await expect(page.locator('.hero-photo .frame-b')).toHaveCount(1);
   await expectNoAxeViolations(page);
 
   await page.goto('/fitmama/#/exercises/glute-bridge');
   await expect(page.getByRole('heading', { name: 'Glute bridge' })).toBeVisible();
-  await expect(page.locator('.hero-photo img')).toHaveAttribute('src', /glute-bridge/);
+  await expect(page.locator('.hero-photo .frame-a')).toHaveAttribute('src', /glute-bridge-a/);
   await expect(page.locator('.detail .character')).toHaveCount(0);
   await expect(page.getByRole('link', { name: 'Play it as a game' })).toBeVisible();
   await expectNoAxeViolations(page);
@@ -156,7 +158,7 @@ test('finishing a day saves the result and unlocks the next day', async ({ page 
   await expect(popover).toBeVisible();
   const popBox = await popover.boundingBox();
   const cueBox = await page.getByTestId('cue').boundingBox();
-  const characterBox = await page.locator('.character').boundingBox();
+  const characterBox = await page.getByTestId('stage-art').boundingBox();
   expect(popBox).toBeTruthy();
   expect(cueBox).toBeTruthy();
   expect(characterBox).toBeTruthy();
@@ -254,7 +256,7 @@ test('game HUDs fit on phone portrait and landscape', async ({ page }) => {
     await page.goto('/fitmama/?fast=1#/plan');
     await page.getByTestId('start-day').click();
     await expect(page.getByTestId('pause')).toBeVisible();
-    await expect(page.locator('.character')).toBeVisible();
+    await expect(page.getByTestId('stage-art')).toBeVisible();
     await expectHudFits(page);
   }
 });
@@ -264,13 +266,13 @@ test('hold and breath games follow the song', async ({ page }) => {
   await openReady(page, '/fitmama/?fast=1#/practice/chin-tuck');
   await expect(page.getByTestId('pause')).toBeVisible();
   await expect(page.getByTestId('hold-ring')).toBeVisible();
-  await expect(page.getByTestId('hold-art')).toHaveAttribute('src', /chin-tuck/);
+  await expect(page.getByTestId('hold-art').locator('.frame-a')).toHaveAttribute('src', /chin-tuck-a/);
   await expect(page.getByTestId('tempo-feel')).toHaveText(/Calm|Steady|Brisk/);
   await expect
     .poll(async () => Number((await page.getByTestId('hold-ring').getAttribute('data-progress')) ?? '0'))
     .toBeGreaterThan(0.2);
   await openReady(page, '/fitmama/?fast=1#/practice/breath-46');
-  await expect(page.getByTestId('breath-circle')).toHaveAttribute('src', /breathing-4-6/);
+  await expect(page.getByTestId('breath-circle').locator('.frame-a')).toHaveAttribute('src', /breathing-4-6-a/);
   await expect(page.getByTestId('pause')).toBeVisible();
   await expect(page.getByTestId('breath-circle')).toBeVisible();
   await expect(page.getByTestId('cue')).toHaveText(/Inhale|Exhale/);

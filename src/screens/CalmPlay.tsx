@@ -2,10 +2,11 @@ import { useEffect, useRef, useState } from 'react';
 import { Pause, Play, Star } from 'lucide-react';
 import { GameClock } from '../audio/clock';
 import { music, unlockAudio } from '../audio/engine';
+import { ExerciseFrames } from '../components/ExerciseFrames';
 import { SoundControl } from '../components/SoundControl';
 import { SpeedPad } from '../components/SpeedPad';
 import { countdownFrom } from '../config';
-import { exercisePhotos } from '../media';
+import { breathPose, holdPose, poseAmount } from '../domain/frames';
 import { formatClock, formatPoints } from '../domain/format';
 import { breathFrame, breathPattern, holdBeatsLeft, holdsCompleted, type BlockResult } from '../domain/play';
 import { MAX_COMBO, POINTS_PER_UP, comboMessage, type ScoreState } from '../domain/scoring';
@@ -76,7 +77,15 @@ export function CalmPlay({
     combo: opening.combo,
     maxCombo: opening.maxCombo,
   });
-  const [visual, setVisual] = useState({ progress: 0, holding: true, beats: 0, phase: 'inhale' as 'inhale' | 'exhale', breathCount: 1, scale: 0.62 });
+  const [visual, setVisual] = useState({
+    progress: 0,
+    holding: true,
+    beats: 0,
+    phase: 'inhale' as 'inhale' | 'exhale',
+    breathCount: 1,
+    scale: 0.62,
+    blend: 0,
+  });
   const [pops, setPops] = useState<Pop[]>([]);
   const [saveError, setSaveError] = useState<string | null>(null);
   const scoreRef = useRef<ScoreState>(opening);
@@ -192,6 +201,7 @@ export function CalmPlay({
           phase: breath.phase,
           breathCount: breath.count,
           scale,
+          blend: reduce ? 0 : poseAmount(exercise.id, breathPose(breath.phase, breath.local)),
         });
       } else {
         const cycle = holdFor + restSeconds;
@@ -208,6 +218,7 @@ export function CalmPlay({
           phase: 'inhale',
           breathCount: 1,
           scale: 0.62 + 0.38 * progress,
+          blend: reduce ? 0 : poseAmount(exercise.id, holdPose(into, holdFor, restSeconds)),
         });
       }
       if (added > 0) {
@@ -237,7 +248,7 @@ export function CalmPlay({
     };
     frame = requestAnimationFrame(loop);
     return () => cancelAnimationFrame(frame);
-  }, [duration, exercise.mode, holdFor, mode, reduce, restSeconds, songBpm]);
+  }, [duration, exercise.id, exercise.mode, holdFor, mode, reduce, restSeconds, songBpm]);
 
   useEffect(() => {
     music.apply(volume, muted);
@@ -279,7 +290,6 @@ export function CalmPlay({
         ? 'Hold'
         : 'Rest';
   const cueClass = exercise.mode === 'breath' ? (visual.phase === 'inhale' ? 'up' : 'down') : visual.holding ? 'up' : 'down';
-  const art = exercisePhotos[exercise.id];
 
   return (
     <div className="game" data-testid="game">
@@ -323,30 +333,23 @@ export function CalmPlay({
         </p>
         {exercise.mode === 'breath' ? (
           <div className="breath-wrap">
-            {art ? (
-              <img
-                className="breath-circle breath-art"
-                data-testid="breath-circle"
-                data-scale={visual.scale.toFixed(2)}
-                src={art}
-                alt=""
-                style={{ transform: `scale(${visual.scale})` }}
-              />
-            ) : (
-              <div
-                className="breath-circle"
-                data-testid="breath-circle"
-                data-scale={visual.scale.toFixed(2)}
-                style={{ transform: `scale(${visual.scale})` }}
-              />
-            )}
+            <div className="breath-circle breath-figure" data-testid="breath-circle" data-scale={visual.scale.toFixed(2)}>
+              <ExerciseFrames exercise={exercise} driven pose={visual.blend} reduce={reduce} className="breath-art" />
+            </div>
             <p className="breath-label">{exercise.name}</p>
           </div>
         ) : (
           <div className="hold-wrap">
             <div className="hold-stage">
               <HoldRing progress={visual.progress} />
-              {art ? <img className="hold-art" src={art} alt="" data-testid="hold-art" /> : null}
+              <ExerciseFrames
+                exercise={exercise}
+                driven
+                pose={visual.blend}
+                reduce={reduce}
+                className="hold-art"
+                testId="hold-art"
+              />
             </div>
             <p className="hold-count" data-testid="hold-beats">
               {visual.beats > 0 ? visual.beats : '·'}
