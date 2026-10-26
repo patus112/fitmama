@@ -1,4 +1,5 @@
 import Dexie, { type Table } from 'dexie';
+import { migrateSessionRow, migrateSettingsRow } from '../domain/migrate';
 import {
   DEFAULT_SETTINGS,
   normalizeSettings,
@@ -8,6 +9,29 @@ import {
   type SessionInput,
   type Settings,
 } from '../domain/session';
+
+export const FITMAMA_STORES = {
+  sessions: '++id, date, dayKey, completed',
+  settings: 'id',
+  audio: 'id',
+  favorites: 'exerciseId',
+} as const;
+
+export function registerFitMamaSchema(database: Dexie): void {
+  database.version(1).stores(FITMAMA_STORES);
+  database.version(2)
+    .stores(FITMAMA_STORES)
+    .upgrade(async (tx) => {
+      await tx.table('sessions').toCollection().modify((row: object) => {
+        const next = migrateSessionRow(row);
+        if (!next) return;
+        Object.assign(row, next);
+      });
+      await tx.table('settings').toCollection().modify((row: object) => {
+        Object.assign(row, migrateSettingsRow(row));
+      });
+    });
+}
 
 interface SessionRow extends SessionInput {
   id?: number;
@@ -38,12 +62,7 @@ class FitMamaDB extends Dexie {
 
   constructor() {
     super('fitmama');
-    this.version(1).stores({
-      sessions: '++id, date, dayKey, completed',
-      settings: 'id',
-      audio: 'id',
-      favorites: 'exerciseId',
-    });
+    registerFitMamaSchema(this);
   }
 }
 
@@ -80,6 +99,8 @@ export async function loadSettings(): Promise<Settings> {
       customBpm: row.customBpm,
       bpmManual: row.bpmManual,
       speeds: row.speeds,
+      zones: row.zones,
+      disclaimerAck: row.disclaimerAck,
     }) ?? DEFAULT_SETTINGS
   );
 }

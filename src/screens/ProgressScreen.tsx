@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { addMonths, eachDayOfInterval, endOfMonth, format, getISODay, startOfMonth } from 'date-fns';
 import { ChevronLeft, ChevronRight, Flame } from 'lucide-react';
+import { QuietLinks } from '../components/QuietLinks';
 import { formatPoints } from '../domain/format';
 import { badgesFor, bestStreak, currentStreak } from '../domain/streak';
 import { useAppState } from '../state/AppState';
@@ -22,7 +23,10 @@ export function ProgressScreen() {
   return (
     <div className="screen">
       <header className="top block-top">
-        <p className="hello">Finished games, nothing else</p>
+        <div className="top-links">
+          <p className="hello">Finished games, nothing else</p>
+          <QuietLinks />
+        </div>
         <h1>Progress</h1>
       </header>
 

@@ -1,31 +1,17 @@
-import { useEffect, useState } from 'react';
 import { ArrowDown, ArrowUp, ChevronLeft, CircleAlert, Heart, Play, Timer, Wind } from 'lucide-react';
 import { music, unlockAudio } from '../audio/engine';
 import { ExerciseFigure } from '../components/ExerciseFigure';
 import { equipmentLabel, exerciseById } from '../domain/catalog';
-import { completedDayKeys, frontierDay } from '../domain/plan';
-import { useReducedMotion } from '../hooks/useReducedMotion';
+import { DISCLAIMER, zoneById } from '../domain/zones';
 import { useAppState } from '../state/AppState';
 
 export function ExerciseDetailScreen({ id }: { id: string }) {
   const exercise = exerciseById(id);
-  const { favorites, toggleFavorite, sessions, settings, customUrl } = useAppState();
-  const reduce = useReducedMotion();
+  const { favorites, toggleFavorite, settings, customUrl } = useAppState();
   function beginAudio() {
     unlockAudio();
     if (settings.trackId === 'custom' && customUrl) music.armFile(customUrl, false);
   }
-  const [pose, setPose] = useState(0);
-
-  useEffect(() => {
-    if (!exercise?.hasCharacter || reduce) return;
-    let up = false;
-    const timer = window.setInterval(() => {
-      up = !up;
-      setPose(up ? 1 : 0);
-    }, 1600);
-    return () => window.clearInterval(timer);
-  }, [exercise?.hasCharacter, reduce]);
 
   if (!exercise) {
     return (
@@ -39,12 +25,11 @@ export function ExerciseDetailScreen({ id }: { id: string }) {
   }
 
   const favorite = favorites.has(exercise.id);
-  const frontier = frontierDay(completedDayKeys(sessions));
 
   return (
     <div className="screen detail">
       <header className="detail-bar">
-        <a className="icon-btn" href="#/exercises" aria-label="Back to exercises">
+        <a className="icon-btn" href="#/exercises" aria-label="Back to library">
           <ChevronLeft size={22} aria-hidden="true" />
         </a>
         <h1 className="detail-title">Exercise</h1>
@@ -60,7 +45,7 @@ export function ExerciseDetailScreen({ id }: { id: string }) {
       </header>
 
       <div className="hero-wrap">
-        <ExerciseFigure exercise={exercise} pose={pose} />
+        <ExerciseFigure exercise={exercise} />
         <span className="time-badge">
           <Timer size={14} aria-hidden="true" /> {exercise.defaultSeconds} s
         </span>
@@ -72,7 +57,13 @@ export function ExerciseDetailScreen({ id }: { id: string }) {
       </div>
 
       <h2 className="exercise-name">{exercise.name}</h2>
+      <div className="zone-chips" role="group" aria-label="Zones">
+        {exercise.zones.map((id) => (
+          <span key={id}>{zoneById(id)?.name}</span>
+        ))}
+      </div>
       <p className="lede">{exercise.summary}</p>
+      {exercise.honestNote ? <p className="honest-note">{exercise.honestNote}</p> : null}
 
       <section className="card">
         <h3>
@@ -129,18 +120,21 @@ export function ExerciseDetailScreen({ id }: { id: string }) {
         </ul>
       </section>
 
-      {exercise.hasCharacter ? (
-        <a
-          className="btn btn-coral detail-cta"
-          href={`#/game/${frontier.phaseIndex}/${frontier.day}`}
-          onClick={beginAudio}
-        >
-          <Play size={18} fill="#3B2A24" aria-hidden="true" />
-          Play it as a game
-        </a>
-      ) : (
-        <p className="quiet-note">The rhythm game for this one is on the way. Glute bridge is ready now.</p>
-      )}
+      <section className="card">
+        <h3>
+          <span className="card-icon coral">
+            <CircleAlert size={16} aria-hidden="true" />
+          </span>
+          Stop if
+        </h3>
+        <p>{exercise.stopIf}</p>
+      </section>
+      <p className="disclaimer">{DISCLAIMER}</p>
+
+      <a className="btn btn-coral detail-cta" href={`#/practice/${exercise.id}`} onClick={beginAudio}>
+        <Play size={18} fill="#3B2A24" aria-hidden="true" />
+        {exercise.id === 'glute-bridge' ? 'Play it as a game' : 'Play this'}
+      </a>
     </div>
   );
 }

@@ -5,6 +5,7 @@ export type Route =
   | { name: 'exercises' }
   | { name: 'exercise'; id: string }
   | { name: 'game'; phaseIndex: number; day: number }
+  | { name: 'practice'; id: string }
   | { name: 'results'; sessionId: number }
   | { name: 'progress' }
   | { name: 'settings' }
@@ -19,6 +20,7 @@ export function parseHash(hash: string): Route {
   if (head === 'exercises') return { name: 'exercises' };
   if (head === 'progress') return { name: 'progress' };
   if (head === 'settings') return { name: 'settings' };
+  if (head === 'practice' && parts[1]) return { name: 'practice', id: decodeURIComponent(parts[1]) };
   if (head === 'game' && parts[1] && parts[2]) {
     const phaseIndex = Number(parts[1]);
     const day = Number(parts[2]);

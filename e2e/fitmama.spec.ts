@@ -1,6 +1,24 @@
 import AxeBuilder from '@axe-core/playwright';
 import { expect, test, type Page } from '@playwright/test';
 import { UNPLAYABLE_SONG } from '../src/domain/songFile';
+import { DISCLAIMER } from '../src/domain/zones';
+
+async function openReady(page: Page, url: string) {
+  await page.goto(url);
+  const shell = page.locator('.onboard, .screen, .game, .results');
+  await expect(shell.first()).toBeVisible();
+  const onboard = page.getByTestId('onboarding');
+  if (!(await onboard.isVisible())) return;
+  await page.getByRole('button', { name: 'Hips & bottom' }).click();
+  await page.getByRole('button', { name: 'Pelvic floor' }).click();
+  await page.getByRole('button', { name: 'Relax & breathe' }).click();
+  await page.getByRole('checkbox', { name: DISCLAIMER }).check();
+  await page.getByRole('button', { name: 'Build my plan' }).click();
+  await expect(onboard).toHaveCount(0);
+  await page.goto(url);
+  await expect(shell.first()).toBeVisible();
+  await expect(onboard).toHaveCount(0);
+}
 
 function boxesOverlap(
   a: { x: number; y: number; width: number; height: number },
@@ -21,7 +39,7 @@ async function expectNoAxeViolations(page: Page) {
 }
 
 test('plan, library, and calm copy are on the main screens', async ({ page }) => {
-  await page.goto('/fitmama/#/plan');
+  await openReady(page, '/fitmama/#/plan');
   await expect(page.getByRole('heading', { name: 'My Plan' })).toBeVisible();
   for (const name of [
     'Body Adaptation',
@@ -34,17 +52,34 @@ test('plan, library, and calm copy are on the main screens', async ({ page }) =>
   }
   await expect(page.getByTestId('day-p1d1')).toHaveAttribute('data-state', 'current');
   await expect(page.getByTestId('day-p1d2')).toHaveAttribute('data-state', 'locked');
+  await expect(page.locator('[data-testid="today-plan"] img.thumb').first()).toBeVisible();
   await expectNoAxeViolations(page);
 
   await page.goto('/fitmama/#/exercises');
-  await expect(page.getByRole('heading', { name: 'Exercises' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Library' })).toBeVisible();
+  await expect(page.getByText(DISCLAIMER)).toBeVisible();
   await expect(page.getByRole('link', { name: /Glute bridge/ })).toBeVisible();
   await expect(page.getByRole('link', { name: /Heel slides/ })).toBeVisible();
+  await expect(page.locator('a[href="#/exercises/heel-slides"] img.thumb')).toHaveAttribute('src', /heel-slides/);
+  await expect(page.locator('a[href="#/exercises/glute-bridge"] img.thumb')).toHaveAttribute('src', /glute-bridge/);
   await expect(page.getByRole('link', { name: /Leg circles/ })).toBeVisible();
+  await page.getByRole('button', { name: 'Neck & chin' }).click();
+  await expect(page.getByRole('link', { name: /Chin tuck/ })).toBeVisible();
+  await expect(page.getByRole('link', { name: /Glute bridge/ })).toHaveCount(0);
+  await page.getByRole('button', { name: 'All' }).click();
+  await expect(page.locator('a[href="#/exercises/chin-tuck"] img.thumb')).toHaveAttribute('src', /chin-tuck/);
+  await expect(page.locator('.placeholder-art')).toHaveCount(0);
+  await expectNoAxeViolations(page);
+
+  await page.goto('/fitmama/#/exercises/chin-tuck');
+  await expect(page.getByRole('heading', { name: 'Chin tuck' })).toBeVisible();
+  await expect(page.locator('.hero-photo img')).toHaveAttribute('src', /chin-tuck/);
   await expectNoAxeViolations(page);
 
   await page.goto('/fitmama/#/exercises/glute-bridge');
   await expect(page.getByRole('heading', { name: 'Glute bridge' })).toBeVisible();
+  await expect(page.locator('.hero-photo img')).toHaveAttribute('src', /glute-bridge/);
+  await expect(page.locator('.detail .character')).toHaveCount(0);
   await expect(page.getByRole('link', { name: 'Play it as a game' })).toBeVisible();
   await expectNoAxeViolations(page);
 
@@ -55,6 +90,7 @@ test('plan, library, and calm copy are on the main screens', async ({ page }) =>
 
   await page.goto('/fitmama/#/settings');
   await expect(page.getByRole('heading', { name: 'Profile' })).toBeVisible();
+  await expect(page.getByText(DISCLAIMER)).toBeVisible();
   await expect(page.getByRole('slider', { name: 'Music volume' })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Mute music' })).toBeVisible();
   const songInput = page.getByLabel('Choose an audio file');
@@ -76,7 +112,7 @@ test('plan, library, and calm copy are on the main screens', async ({ page }) =>
 });
 
 test('test sound and preview unlock audio in the tap', async ({ page }) => {
-  await page.goto('/fitmama/#/settings');
+  await openReady(page, '/fitmama/#/settings');
   await page.getByRole('button', { name: 'Test sound' }).click();
   await expect(page.getByRole('status')).toHaveText('A short tone.');
   const afterTone = await page.evaluate(() => window.__fitmamaAudioLog ?? []);
@@ -91,7 +127,7 @@ test('test sound and preview unlock audio in the tap', async ({ page }) => {
 });
 
 test('a chosen song is kept on the phone and a text file is turned away', async ({ page }) => {
-  await page.goto('/fitmama/#/settings');
+  await openReady(page, '/fitmama/#/settings');
   const input = page.getByLabel('Choose an audio file');
   await input.setInputFiles({
     name: 'notes.txt',
@@ -110,7 +146,7 @@ test('a chosen song is kept on the phone and a text file is turned away', async 
 
 test('finishing a day saves the result and unlocks the next day', async ({ page }) => {
   test.setTimeout(45_000);
-  await page.goto('/fitmama/?fast=1#/plan');
+  await openReady(page, '/fitmama/?fast=1#/plan');
   await page.getByTestId('start-day').click();
   await page.setViewportSize({ width: 844, height: 390 });
   await expect(page.getByTestId('pause')).toBeVisible();
@@ -142,7 +178,7 @@ test('finishing a day saves the result and unlocks the next day', async ({ page 
 
 test('ending early keeps the next day closed', async ({ page }) => {
   test.setTimeout(30_000);
-  await page.goto('/fitmama/?fast=1#/plan');
+  await openReady(page, '/fitmama/?fast=1#/plan');
   await page.getByTestId('start-day').click();
   await page.getByRole('button', { name: 'Pause' }).click();
   await expect(page.getByTestId('speed-pad')).toBeVisible();
@@ -157,6 +193,89 @@ test('ending early keeps the next day closed', async ({ page }) => {
   await expect(page.getByTestId('day-p1d2')).toHaveAttribute('data-state', 'locked');
 });
 
+async function expectHudFits(page: Page) {
+  await expect(page.getByTestId('combo')).toContainText(/Find the groove|Nice and easy|Nice rhythm!|Smooth and slow|In the flow/);
+  const boxes = await page.evaluate(() => {
+    const ids = ['combo', 'timer', 'live-score', 'pause', 'music-button'];
+    return ids.map((id) => {
+      const el = document.querySelector(`[data-testid="${id}"]`);
+      if (!el) return null;
+      const box = el.getBoundingClientRect();
+      let clipped = box.left < -1 || box.top < -1 || box.right > window.innerWidth + 1 || box.bottom > window.innerHeight + 1;
+      let parent = el.parentElement;
+      while (parent && !clipped) {
+        const style = getComputedStyle(parent);
+        const overflow = `${style.overflow}${style.overflowX}${style.overflowY}`;
+        if (/hidden|clip/.test(overflow)) {
+          const frame = parent.getBoundingClientRect();
+          clipped = box.left < frame.left - 1 || box.right > frame.right + 1 || box.top < frame.top - 1 || box.bottom > frame.bottom + 1;
+        }
+        parent = parent.parentElement;
+      }
+      const strong = el.querySelector('strong');
+      const textCut = strong ? strong.scrollWidth > strong.clientWidth + 1 || strong.scrollHeight > strong.clientHeight + 1 : false;
+      return { id, x: box.x, y: box.y, width: box.width, height: box.height, clipped, textCut };
+    });
+  });
+  const visible = boxes.filter((box): box is NonNullable<typeof box> => box !== null && box.width > 0);
+  expect(visible.map((box) => box.id)).toEqual(['combo', 'timer', 'live-score', 'pause', 'music-button']);
+  const bad = visible.filter((box) => box.clipped || box.textCut);
+  expect(bad, JSON.stringify(visible)).toEqual([]);
+  for (let index = 0; index < visible.length; index += 1) {
+    for (let other = index + 1; other < visible.length; other += 1) {
+      const a = visible[index];
+      const b = visible[other];
+      if (!a || !b) continue;
+      expect(boxesOverlap(a, b), `${a.id} overlaps ${b.id}`).toBe(false);
+    }
+  }
+}
+
+test('game HUDs fit on phone portrait and landscape', async ({ page }) => {
+  test.setTimeout(60_000);
+  const sizes = [
+    { width: 390, height: 844 },
+    { width: 375, height: 667 },
+    { width: 844, height: 390 },
+  ];
+  await openReady(page, '/fitmama/?fast=1#/practice/chin-tuck');
+  for (const size of sizes) {
+    await page.setViewportSize(size);
+    await page.goto('/fitmama/?fast=1#/practice/chin-tuck');
+    await expect(page.getByTestId('pause')).toBeVisible();
+    await expect(page.getByTestId('hold-ring')).toBeVisible();
+    await expectHudFits(page);
+
+    await page.goto('/fitmama/?fast=1#/practice/breath-46');
+    await expect(page.getByTestId('pause')).toBeVisible();
+    await expect(page.getByTestId('breath-circle')).toBeVisible();
+    await expectHudFits(page);
+
+    await page.goto('/fitmama/?fast=1#/plan');
+    await page.getByTestId('start-day').click();
+    await expect(page.getByTestId('pause')).toBeVisible();
+    await expect(page.locator('.character')).toBeVisible();
+    await expectHudFits(page);
+  }
+});
+
+test('hold and breath games follow the song', async ({ page }) => {
+  test.setTimeout(20_000);
+  await openReady(page, '/fitmama/?fast=1#/practice/chin-tuck');
+  await expect(page.getByTestId('pause')).toBeVisible();
+  await expect(page.getByTestId('hold-ring')).toBeVisible();
+  await expect(page.getByTestId('hold-art')).toHaveAttribute('src', /chin-tuck/);
+  await expect(page.getByTestId('tempo-feel')).toHaveText(/Calm|Steady|Brisk/);
+  await expect
+    .poll(async () => Number((await page.getByTestId('hold-ring').getAttribute('data-progress')) ?? '0'))
+    .toBeGreaterThan(0.2);
+  await openReady(page, '/fitmama/?fast=1#/practice/breath-46');
+  await expect(page.getByTestId('breath-circle')).toHaveAttribute('src', /breathing-4-6/);
+  await expect(page.getByTestId('pause')).toBeVisible();
+  await expect(page.getByTestId('breath-circle')).toBeVisible();
+  await expect(page.getByTestId('cue')).toHaveText(/Inhale|Exhale/);
+});
+
 test.describe('screenshots', () => {
   test.use({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 1, isMobile: true, hasTouch: true });
 
@@ -164,6 +283,21 @@ test('capture mobile screens @screenshots', async ({ page }) => {
   test.setTimeout(300_000);
   const out = process.env.SHOT_DIR ?? '/opt/cursor/artifacts';
   await page.setViewportSize({ width: 390, height: 844 });
+
+  await page.goto('/fitmama/#/plan');
+  await expect(page.getByTestId('onboarding')).toBeVisible();
+  await page.screenshot({ path: `${out}/screenshot_onboarding_zones.png` });
+  await openReady(page, '/fitmama/#/plan');
+  await page.getByTestId('today-plan').scrollIntoViewIfNeeded();
+  await page.screenshot({ path: `${out}/screenshot_generated_plan.png` });
+
+  await page.goto('/fitmama/#/exercises');
+  await expect(page.getByRole('heading', { name: 'Library' })).toBeVisible();
+  await page.screenshot({ path: `${out}/screenshot_library.png` });
+
+  await page.goto('/fitmama/#/exercises/chin-tuck');
+  await expect(page.getByRole('heading', { name: 'Chin tuck' })).toBeVisible();
+  await page.screenshot({ path: `${out}/screenshot_library_detail.png` });
 
   await page.goto('/fitmama/#/exercises/glute-bridge');
   await expect(page.getByRole('heading', { name: 'Glute bridge' })).toBeVisible();
@@ -173,10 +307,27 @@ test('capture mobile screens @screenshots', async ({ page }) => {
   await expect(page.getByRole('heading', { name: 'Profile' })).toBeVisible();
   await page.screenshot({ path: `${out}/screenshot_settings.png` });
 
+  await page.goto('/fitmama/?fast=1#/practice/chin-tuck');
+  await expect(page.getByTestId('hold-ring')).toBeVisible();
+  await expect(page.getByTestId('pause')).toBeVisible();
+  await expect
+    .poll(async () => Number((await page.getByTestId('hold-ring').getAttribute('data-progress')) ?? '0'))
+    .toBeGreaterThan(0.25);
+  await page.screenshot({ path: `${out}/screenshot_hold_mode.png` });
+
+  await page.goto('/fitmama/?fast=1#/practice/breath-46');
+  await expect(page.getByTestId('breath-circle')).toBeVisible();
+  await expect(page.getByTestId('cue')).toHaveText(/Inhale|Exhale/);
+  await page.screenshot({ path: `${out}/screenshot_breath_mode.png` });
+
   await page.goto('/fitmama/?fast=1#/plan');
   for (let index = 0; index < 2; index += 1) {
     await page.getByTestId('start-day').click();
     await expect(page.getByTestId('results')).toBeVisible({ timeout: 30_000 });
+    if (index === 1) {
+      await page.setViewportSize({ width: 390, height: 844 });
+      await page.screenshot({ path: `${out}/screenshot_results.png` });
+    }
     await page.getByRole('link', { name: 'Back to my plan' }).click();
     await expect(page.getByRole('heading', { name: 'My Plan' })).toBeVisible();
   }
@@ -204,20 +355,17 @@ test('capture mobile screens @screenshots', async ({ page }) => {
     .toBeLessThan(136);
   await page.screenshot({ path: `${out}/screenshot_game_cue.png` });
 
-  await expect(page.getByTestId('results')).toBeVisible({ timeout: 240_000 });
   await page.setViewportSize({ width: 390, height: 844 });
-  await page.screenshot({ path: `${out}/screenshot_results.png` });
-
   await page.goto('/fitmama/#/progress');
   await expect(page.getByTestId('progress-streak')).toBeVisible();
   await page.screenshot({ path: `${out}/screenshot_progress.png` });
 });
 
 test('capture the game with the cue clear @screenshots', async ({ page }) => {
-  test.setTimeout(90_000);
+  test.setTimeout(120_000);
   const out = process.env.SHOT_DIR ?? '/opt/cursor/artifacts';
   await page.setViewportSize({ width: 844, height: 390 });
-  await page.goto('/fitmama/#/plan');
+  await openReady(page, '/fitmama/#/plan');
   await page.getByTestId('start-day').click();
   await expect(page.getByTestId('speed-pad')).toBeVisible();
   await page.screenshot({ path: `${out}/screenshot_game_countdown.png` });
@@ -233,7 +381,7 @@ test('capture the game with the cue clear @screenshots', async ({ page }) => {
         if (!match?.[1] || !match[2]) return 9999;
         return Number(match[1]) * 60 + Number(match[2]);
       },
-      { timeout: 60_000 },
+      { timeout: 90_000 },
     )
     .toBeLessThan(168);
   await page.screenshot({ path: `${out}/screenshot_game_cue.png` });

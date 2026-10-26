@@ -18,6 +18,7 @@ import {
 import { clampSpeed } from '../domain/tempo';
 import { clampBpm, clampVolume, type TrackId } from '../domain/tracks';
 import { DEFAULT_SETTINGS, type SavedSession, type Settings } from '../domain/session';
+import { sortZones, type ZoneId } from '../domain/zones';
 
 const MAX_AUDIO_BYTES = 20 * 1024 * 1024;
 
@@ -43,6 +44,7 @@ interface AppStateValue {
   removeCustomFile: () => Promise<void>;
   toggleFavorite: (exerciseId: string) => void;
   refreshSessions: () => Promise<void>;
+  setZones: (zones: readonly ZoneId[]) => Promise<void>;
 }
 
 const AppStateContext = createContext<AppStateValue | null>(null);
@@ -225,6 +227,14 @@ export function AppProvider({ children }: { children: ReactNode }) {
         setBeatMessage(null);
         replaceUrl(null);
         if (settingsRef.current.trackId === 'custom') persist({ trackId: 'sunday-stretch' });
+      },
+      setZones: async (zones) => {
+        const next = sortZones(zones);
+        if (next.length === 0) return;
+        const updated = { ...settingsRef.current, zones: next, disclaimerAck: true };
+        settingsRef.current = updated;
+        await saveSettings(updated);
+        setSettings(updated);
       },
       toggleFavorite: (exerciseId) => {
         const on = !favorites.has(exerciseId);

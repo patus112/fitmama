@@ -1,10 +1,13 @@
 import { z } from 'zod';
+import { illustrationPath } from './illustrations';
+import { moreExercises } from './moreExercises';
+import { ZONE_IDS, type ZoneId } from './zones';
 
 export const exerciseSchema = z.object({
   id: z.string().regex(/^[a-z0-9-]+$/),
   name: z.string().min(1),
   targetArea: z.string().min(1),
-  position: z.enum(['Lying down', 'All fours', 'Side lying', 'Standing']),
+  position: z.enum(['Lying down', 'All fours', 'Side lying', 'Standing', 'Seated']),
   equipment: z.string().min(1),
   onCouch: z.boolean(),
   hasCharacter: z.boolean(),
@@ -19,13 +22,32 @@ export const exerciseSchema = z.object({
   tempoSeconds: z.number().min(2).max(4),
   minRepSeconds: z.number().min(2).max(4).optional(),
   maxRepSeconds: z.number().min(2).max(4).optional(),
+  zones: z.array(z.enum(ZONE_IDS)).min(1).optional(),
+  mode: z.enum(['rep', 'hold', 'breath']).optional(),
+  stopIf: z.string().min(1).optional(),
+  image: z.string().min(1).optional(),
+  holdSeconds: z.number().positive().max(300).optional(),
+  singleHold: z.boolean().optional(),
+  cueUp: z.string().min(1).optional(),
+  cueDown: z.string().min(1).optional(),
+  honestNote: z.string().min(1).optional(),
 });
 
 type ExerciseInput = z.infer<typeof exerciseSchema>;
 
+export type ExerciseMode = 'rep' | 'hold' | 'breath';
+
 export type Exercise = ExerciseInput & {
   minRepSeconds: number;
   maxRepSeconds: number;
+  zones: ZoneId[];
+  mode: ExerciseMode;
+  stopIf: string;
+  image: string;
+  holdSeconds: number;
+  singleHold: boolean;
+  cueUp: string;
+  cueDown: string;
 };
 
 const rawExercises = [
@@ -341,13 +363,51 @@ const rawExercises = [
   },
 ];
 
+const ZONE_BY_ID: Record<string, ZoneId[]> = {
+  'heel-slides': ['belly'],
+  'dead-bug': ['belly'],
+  'belly-draw-in': ['belly'],
+  'short-plank': ['belly'],
+  'glute-bridge': ['hips', 'pelvic-floor', 'lower-back'],
+  'side-leg-raise': ['hips', 'thighs'],
+  clamshells: ['hips', 'pelvic-floor'],
+  'squat-dumbbell': ['thighs', 'hips'],
+  'bird-dog': ['belly', 'lower-back'],
+  'knees-to-chest': ['lower-back'],
+  'pelvic-floor': ['pelvic-floor'],
+  'alternating-leg-raises': ['belly'],
+  'knees-apart': ['hips', 'pelvic-floor'],
+  'leg-circles': ['belly', 'hips'],
+};
+
+const DEFAULT_STOP = 'Stop if anything hurts. Stay slow, and never move into pain.';
+
 function withRepWindow(exercise: ExerciseInput): Exercise {
   const minRepSeconds = exercise.minRepSeconds ?? (exercise.tempoSeconds >= 3.5 ? 3 : 2);
   const maxRepSeconds = exercise.maxRepSeconds ?? 4;
-  return { ...exercise, minRepSeconds, maxRepSeconds };
+  const mode = exercise.mode ?? (exercise.id === 'short-plank' ? 'hold' : 'rep');
+  const zones = exercise.zones ?? ZONE_BY_ID[exercise.id] ?? ['relax'];
+  const image = exercise.image ?? illustrationPath(exercise.id) ?? `placeholders/${exercise.id}.svg`;
+  return {
+    ...exercise,
+    minRepSeconds,
+    maxRepSeconds,
+    zones,
+    mode,
+    stopIf: exercise.stopIf ?? DEFAULT_STOP,
+    image,
+    holdSeconds: exercise.holdSeconds ?? (exercise.id === 'short-plank' ? 30 : 8),
+    singleHold: exercise.singleHold ?? exercise.id === 'short-plank',
+    cueUp: exercise.cueUp ?? (exercise.id === 'glute-bridge' ? 'Hips up' : 'Lift'),
+    cueDown: exercise.cueDown ?? (exercise.id === 'glute-bridge' ? 'Hips down' : 'Lower'),
+  };
 }
 
-export const exercises: Exercise[] = z.array(exerciseSchema).parse(rawExercises).map(withRepWindow);
+export const exercises: Exercise[] = z.array(exerciseSchema).parse([...rawExercises, ...moreExercises]).map(withRepWindow);
+
+export function exercisesNeedingArt(): Exercise[] {
+  return exercises.filter((exercise) => exercise.image.startsWith('placeholders/'));
+}
 
 export const GLUTE_BRIDGE_ID = 'glute-bridge';
 
