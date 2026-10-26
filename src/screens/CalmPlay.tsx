@@ -6,7 +6,7 @@ import { ExerciseFrames } from '../components/ExerciseFrames';
 import { SoundControl } from '../components/SoundControl';
 import { SpeedPad } from '../components/SpeedPad';
 import { countdownFrom } from '../config';
-import { breathPose, holdPose, poseAmount } from '../domain/frames';
+import { breathPose, holdPose, shownPose } from '../domain/frames';
 import { formatClock, formatPoints } from '../domain/format';
 import { breathFrame, breathPattern, holdBeatsLeft, holdsCompleted, type BlockResult } from '../domain/play';
 import { MAX_COMBO, POINTS_PER_UP, comboMessage, type ScoreState } from '../domain/scoring';
@@ -201,7 +201,16 @@ export function CalmPlay({
           phase: breath.phase,
           breathCount: breath.count,
           scale,
-          blend: reduce ? 0 : poseAmount(exercise.id, breathPose(breath.phase, breath.local)),
+          blend: reduce
+            ? 0
+            : shownPose(
+                exercise.id,
+                breathPose(
+                  breath.phase,
+                  breath.local,
+                  (breath.phase === 'inhale' ? pattern.inhaleBeats : pattern.exhaleBeats) * pattern.beatSeconds,
+                ),
+              ),
         });
       } else {
         const cycle = holdFor + restSeconds;
@@ -218,7 +227,7 @@ export function CalmPlay({
           phase: 'inhale',
           breathCount: 1,
           scale: 0.62 + 0.38 * progress,
-          blend: reduce ? 0 : poseAmount(exercise.id, holdPose(into, holdFor, restSeconds)),
+          blend: reduce ? 0 : shownPose(exercise.id, holdPose(into, holdFor, restSeconds)),
         });
       }
       if (added > 0) {

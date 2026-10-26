@@ -125,6 +125,7 @@ export function SettingsScreen() {
         <h1>Profile</h1>
       </header>
       <p className="lede">No account, no cloud. Volume, songs, zones, and sessions stay here.</p>
+      <p className="app-version">This copy · {__APP_VERSION__}</p>
       <section className="card">
         <h2>Zones</h2>
         <p className="help">Change these and the 28-day plan rebuilds. Finished days stay finished.</p>

@@ -11,6 +11,18 @@ function render(exercise: Exercise, reduce: boolean) {
 }
 
 describe('ExerciseFrames', () => {
+  it('swaps opacities when the game drives the pose', () => {
+    expect(heel).toBeTruthy();
+    if (!heel) return;
+    const early = renderToStaticMarkup(<ExerciseFrames exercise={heel} driven pose={0.25} reduce={false} />);
+    expect(early).toContain('frame-a');
+    expect(early).toContain('opacity:1');
+    expect(early).toContain('opacity:0.5');
+    const swapped = renderToStaticMarkup(<ExerciseFrames exercise={heel} driven pose={1} reduce={false} />);
+    expect(swapped).toContain('opacity:0');
+    expect(swapped).toContain('opacity:1');
+  });
+
   it('stacks frame A and frame B', () => {
     expect(heel).toBeTruthy();
     if (!heel) return;
