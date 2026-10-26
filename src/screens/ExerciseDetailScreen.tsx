@@ -1,31 +1,17 @@
-import { useEffect, useState } from 'react';
 import { ArrowDown, ArrowUp, ChevronLeft, CircleAlert, Heart, Play, Timer, Wind } from 'lucide-react';
 import { music, unlockAudio } from '../audio/engine';
 import { ExerciseFigure } from '../components/ExerciseFigure';
 import { equipmentLabel, exerciseById } from '../domain/catalog';
-import { useReducedMotion } from '../hooks/useReducedMotion';
 import { DISCLAIMER, zoneById } from '../domain/zones';
 import { useAppState } from '../state/AppState';
 
 export function ExerciseDetailScreen({ id }: { id: string }) {
   const exercise = exerciseById(id);
   const { favorites, toggleFavorite, settings, customUrl } = useAppState();
-  const reduce = useReducedMotion();
   function beginAudio() {
     unlockAudio();
     if (settings.trackId === 'custom' && customUrl) music.armFile(customUrl, false);
   }
-  const [pose, setPose] = useState(0);
-
-  useEffect(() => {
-    if (!exercise?.hasCharacter || reduce) return;
-    let up = false;
-    const timer = window.setInterval(() => {
-      up = !up;
-      setPose(up ? 1 : 0);
-    }, 1600);
-    return () => window.clearInterval(timer);
-  }, [exercise?.hasCharacter, reduce]);
 
   if (!exercise) {
     return (
@@ -59,7 +45,7 @@ export function ExerciseDetailScreen({ id }: { id: string }) {
       </header>
 
       <div className="hero-wrap">
-        <ExerciseFigure exercise={exercise} pose={pose} />
+        <ExerciseFigure exercise={exercise} />
         <span className="time-badge">
           <Timer size={14} aria-hidden="true" /> {exercise.defaultSeconds} s
         </span>

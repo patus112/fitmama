@@ -83,8 +83,8 @@ describe('exercise catalog', () => {
     expect(squat?.summary.toLowerCase()).toContain('not a deep bend');
   });
 
-  it('uses a real illustration for every move that was waiting on art', () => {
-    expect(Object.keys(ILLUSTRATION_FILE_BY_ID)).toHaveLength(21);
+  it('uses a real illustration for every exercise', () => {
+    expect(Object.keys(ILLUSTRATION_FILE_BY_ID)).toHaveLength(exercises.length);
     for (const [id, file] of Object.entries(ILLUSTRATION_FILE_BY_ID)) {
       const exercise = exercises.find((item) => item.id === id);
       expect(exercise?.image).toBe(`illustrations/${file}`);

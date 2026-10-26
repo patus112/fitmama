@@ -306,15 +306,6 @@ img.breath-circle.breath-art {
   background: var(--pale);
 }
 .thumb.fit-contain { object-fit: contain; padding: 4px; }
-.thumb-character {
-  display: grid;
-  place-items: center;
-  font-size: 12px;
-  font-weight: 800;
-  color: var(--green-deep);
-  overflow: hidden;
-}
-.thumb-character .character { width: 150%; height: 100%; aspect-ratio: auto; }
 .game-pill {
   background: var(--pale);
   color: var(--green-deep);
@@ -338,8 +329,6 @@ img.breath-circle.breath-art {
   padding: 10px;
   background: linear-gradient(#fff, #f4fbf6);
 }
-.hero-character { display: grid; align-items: end; }
-.hero-character .character { width: min(100%, 460px); margin: 24px auto 0; }
 .mat { width: 68%; height: 28px; border-radius: 16px; background: var(--sage); }
 .time-badge, .hero-tags span {
   background: white;

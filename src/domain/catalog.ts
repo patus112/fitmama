@@ -380,20 +380,6 @@ const ZONE_BY_ID: Record<string, ZoneId[]> = {
   'leg-circles': ['belly', 'hips'],
 };
 
-const PHOTO_BY_ID: Record<string, string> = {
-  'heel-slides': 'exercises/heel-slides.webp',
-  'dead-bug': 'exercises/dead-bug.webp',
-  'belly-draw-in': 'exercises/belly-draw-in.webp',
-  'short-plank': 'exercises/short-plank.webp',
-  'glute-bridge': 'character/hips-up.webp',
-  'side-leg-raise': 'exercises/side-leg-raise.webp',
-  clamshells: 'exercises/clamshells.webp',
-  'squat-dumbbell': 'exercises/squat-dumbbell.webp',
-  'bird-dog': 'exercises/bird-dog.webp',
-  'knees-to-chest': 'exercises/knees-to-chest.webp',
-  'pelvic-floor': 'exercises/pelvic-floor.webp',
-};
-
 const DEFAULT_STOP = 'Stop if anything hurts. Stay slow, and never move into pain.';
 
 function withRepWindow(exercise: ExerciseInput): Exercise {
@@ -401,7 +387,7 @@ function withRepWindow(exercise: ExerciseInput): Exercise {
   const maxRepSeconds = exercise.maxRepSeconds ?? 4;
   const mode = exercise.mode ?? (exercise.id === 'short-plank' ? 'hold' : 'rep');
   const zones = exercise.zones ?? ZONE_BY_ID[exercise.id] ?? ['relax'];
-  const image = exercise.image ?? illustrationPath(exercise.id) ?? PHOTO_BY_ID[exercise.id] ?? `placeholders/${exercise.id}.svg`;
+  const image = exercise.image ?? illustrationPath(exercise.id) ?? `placeholders/${exercise.id}.svg`;
   return {
     ...exercise,
     minRepSeconds,

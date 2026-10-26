@@ -60,6 +60,8 @@ test('plan, library, and calm copy are on the main screens', async ({ page }) =>
   await expect(page.getByText(DISCLAIMER)).toBeVisible();
   await expect(page.getByRole('link', { name: /Glute bridge/ })).toBeVisible();
   await expect(page.getByRole('link', { name: /Heel slides/ })).toBeVisible();
+  await expect(page.locator('a[href="#/exercises/heel-slides"] img.thumb')).toHaveAttribute('src', /heel-slides/);
+  await expect(page.locator('a[href="#/exercises/glute-bridge"] img.thumb')).toHaveAttribute('src', /glute-bridge/);
   await expect(page.getByRole('link', { name: /Leg circles/ })).toBeVisible();
   await page.getByRole('button', { name: 'Neck & chin' }).click();
   await expect(page.getByRole('link', { name: /Chin tuck/ })).toBeVisible();
@@ -76,6 +78,8 @@ test('plan, library, and calm copy are on the main screens', async ({ page }) =>
 
   await page.goto('/fitmama/#/exercises/glute-bridge');
   await expect(page.getByRole('heading', { name: 'Glute bridge' })).toBeVisible();
+  await expect(page.locator('.hero-photo img')).toHaveAttribute('src', /glute-bridge/);
+  await expect(page.locator('.detail .character')).toHaveCount(0);
   await expect(page.getByRole('link', { name: 'Play it as a game' })).toBeVisible();
   await expectNoAxeViolations(page);
 
