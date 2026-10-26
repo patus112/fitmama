@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { clampSpeed } from './tempo';
 import type { TrackId } from './tracks';
+import { sortZones, ZONE_IDS, type ZoneId } from './zones';
 
 export const sessionExerciseSchema = z.object({
   exerciseId: z.string().min(1),
@@ -43,6 +44,8 @@ const storedSettingsSchema = z.object({
   customBpm: z.number().int().min(40).max(160),
   bpmManual: z.boolean().optional(),
   speeds: z.record(z.string(), z.number()).optional(),
+  zones: z.array(z.enum(ZONE_IDS)).optional(),
+  disclaimerAck: z.boolean().optional(),
 });
 
 export interface Settings {
@@ -52,6 +55,8 @@ export interface Settings {
   customBpm: number;
   bpmManual: boolean;
   speeds: SongSpeeds;
+  zones: ZoneId[];
+  disclaimerAck: boolean;
 }
 
 export function normalizeSpeeds(value: Record<string, number> | undefined): SongSpeeds {
@@ -73,6 +78,8 @@ export function normalizeSettings(input: unknown): Settings | null {
     customBpm: parsed.data.customBpm,
     bpmManual: parsed.data.bpmManual ?? false,
     speeds: normalizeSpeeds(parsed.data.speeds),
+    zones: sortZones(parsed.data.zones ?? []),
+    disclaimerAck: parsed.data.disclaimerAck ?? false,
   };
 }
 
@@ -89,4 +96,6 @@ export const DEFAULT_SETTINGS: Settings = {
   customBpm: 96,
   bpmManual: false,
   speeds: { ...DEFAULT_SPEEDS },
+  zones: [],
+  disclaimerAck: false,
 };
